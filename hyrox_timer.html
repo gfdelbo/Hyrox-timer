@@ -1,0 +1,2427 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HYROX Multi Timer (offline) - compat v3</title>
+<style>
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e7edf7;background:#0b0f17}
+  header{position:sticky;top:0;background:#0b0f17;padding:12px;border-bottom:1px solid #23324a;z-index:10}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 12px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .pill{display:inline-block;padding:4px 10px;border:1px solid #23324a;border-radius:999px;background:#101827;font-size:12px;color:#9fb0c6}
+  .pill b{color:#fff;font-family:ui-monospace,Menlo,Consolas,monospace}
+  button{cursor:pointer;border:1px solid #23324a;color:#e7edf7;background:#101827;padding:10px 12px;border-radius:12px;font-weight:650}
+.btn-load-athletes{background:#16a34a !important;border-color:#16a34a !important;color:#06240f !important;font-weight:800}
+.btn-load-disabled{background:#374151 !important;border-color:#374151 !important;color:#9ca3af !important;cursor:not-allowed;font-weight:700}
+.btn-reset-armed{background:#ef4444 !important;border-color:#ef4444 !important;color:#2b0b0b !important;font-weight:900;animation:resetPulse 1s ease-in-out infinite}
+@keyframes resetPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+.btn-start-ready{background:#16a34a !important;border-color:#16a34a !important;color:#06240f !important;font-weight:800;animation:pulseReady 1.2s ease-in-out infinite}
+@keyframes pulseReady{0%{box-shadow:0 0 0 0 rgba(22,163,74,.6)}70%{box-shadow:0 0 0 8px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  input{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #23324a;background:#101827;color:#e7edf7;outline:none}
+  .grid{display:grid;gap:12px;padding:12px}
+  @media(min-width:840px){.grid{grid-template-columns:1fr 1fr}}
+  @media(min-width:1200px){.grid{grid-template-columns:repeat(4, 1fr)}}
+  @media(min-width:1200px){.grid{grid-template-columns:repeat(4, 1fr)}}
+  .card{border:1px solid #23324a;border-radius:14px;background:#101827;overflow:hidden}
+  .head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #23324a}
+  .badge{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;color:#06101f}
+  .name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+  .muted{color:#9fb0c6}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .body{padding:12px}
+  .big{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:26px;font-weight:900;margin:0 0 8px 0}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
+  .btnrow button{flex:1 1 160px}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;z-index:9999;padding:16px;overflow:auto;pointer-events:auto}
+  .overlay.show{display:block}
+  .modal{max-width:1000px;margin:0 auto;background:#101827;border:1px solid #23324a;border-radius:18px;overflow:hidden}
+  .modalHead{padding:10px 12px;border-bottom:1px solid #23324a;display:flex;justify-content:space-between;align-items:center}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid #23324a;padding:8px 10px;font-size:13px}
+  th{text-align:left;color:#9fb0c6}
+  .dot{display:inline-block;width:16px;height:16px;border-radius:6px;border:1px solid rgba(255,255,255,.12)}
+  .error{margin:10px 12px;padding:10px 12px;border:1px solid #fb7185;border-radius:12px;background:rgba(251,113,133,.10);display:none}
+  /* important for fast taps on mobile */
+  button{touch-action:manipulation;} /* recommended by Chrome devs to avoid delays */ 
+
+.status-running{background:#16a34a !important;border-color:#16a34a !important;color:#06240f !important;
+animation:pulseRunning 1s ease-in-out infinite}
+.status-paused{background:#f59e0b !important;border-color:#f59e0b !important;color:#3b2200 !important;
+animation:pulsePaused 1s ease-in-out infinite}
+
+@keyframes pulseRunning{
+  0%{box-shadow:0 0 0 0 rgba(22,163,74,.6)}
+  70%{box-shadow:0 0 0 8px rgba(22,163,74,0)}
+  100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}
+}
+@keyframes pulsePaused{
+  0%{box-shadow:0 0 0 0 rgba(245,158,11,.6)}
+  70%{box-shadow:0 0 0 8px rgba(245,158,11,0)}
+  100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}
+}
+
+:root{
+  --bg:#0b0f17; --surface:#101827; --surface2:#0f172a; --border:#23324a; --text:#e7edf7; --muted:#9fb0c6;
+  --chip-run:#3b82f6; --chip-ex:#22c55e; --chip-rox:#a855f7; --chip-finish:#f59e0b;
+}
+body{background:var(--bg) !important;color:var(--text) !important}
+header,.card,.modal,.pill,button,input,select,table{transition:background .2s,border-color .2s,color .2s,box-shadow .2s}
+header{background:var(--bg) !important;border-bottom-color:var(--border) !important}
+.card,.modal,.pill,button,input,select,table{background:var(--surface) !important;border-color:var(--border) !important;color:var(--text) !important}
+.muted, th{color:var(--muted) !important}
+.theme-light{
+  --bg:#eef3fb; --surface:#ffffff; --surface2:#f7f9fc; --border:#c9d6ea; --text:#122033; --muted:#5c6f88;
+}
+.theme-light .dot{border-color:rgba(0,0,0,.08)!important}
+.theme-light .btn-load-athletes,.theme-light .btn-start-ready,.theme-light .status-running{color:#ffffff !important}
+.theme-light .btn-reset-armed,.theme-light .status-paused{color:#fff !important}
+.theme-light table{background:#fff !important}
+.mode-gara #setupHint,.mode-gara #summaryWrap,.mode-gara #splitsWrap,.mode-gara #roxSection,.mode-gara #dashboardWrap{display:none}
+.phase-chip{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid transparent}
+.phase-run{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:#93c5fd}
+.phase-ex{background:rgba(34,197,94,.16);border-color:rgba(34,197,94,.45);color:#86efac}
+.phase-rox{background:rgba(168,85,247,.16);border-color:rgba(168,85,247,.45);color:#d8b4fe}
+.phase-finish{background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.45);color:#fcd34d}
+.card.phase-run-card{box-shadow:inset 0 0 0 1px rgba(59,130,246,.45)}
+.card.phase-ex-card{box-shadow:inset 0 0 0 1px rgba(34,197,94,.45)}
+.card.phase-rox-card{box-shadow:inset 0 0 0 1px rgba(168,85,247,.45)}
+.card.phase-finish-card{box-shadow:inset 0 0 0 1px rgba(245,158,11,.45)}
+.last-action{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);display:flex;justify-content:space-between;gap:10px;align-items:center}
+.last-action .label{font-size:12px;color:var(--muted)}
+.last-action .value{font-weight:800}
+.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.metric{padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--surface2)}
+.metric .k{font-size:12px;color:var(--muted)}
+.metric .v{font-size:22px;font-weight:900;margin-top:4px}
+.metric .s{font-size:13px;margin-top:4px}
+
+.theme-light .pill b{color:var(--text) !important}
+
+.penalty-mini{margin-top:4px;padding-top:0;border-top:0}
+.penalty-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.penalty-row select,.penalty-row input{padding:8px 10px;border-radius:10px;border:1px solid #23324a;background:#101827;color:#e7edf7}
+.penalty-row button{padding:8px 10px}
+.penalty-note{font-size:12px;color:#9fb0c6}
+.penalty-badge{display:inline-block;padding:2px 7px;border-radius:999px;border:1px solid #23324a;font-size:11px;font-weight:800}
+.penalty-warning{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.4);color:#fcd34d}
+.penalty-time{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);color:#fca5a5}
+.penalty-noteonly{background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.35);color:#cbd5e1}
+.theme-light .penalty-row select,.theme-light .penalty-row input{background:#fff;color:#122033;border-color:#c9d6ea}
+
+
+.penalty-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.penalty-actions button{padding:8px 10px;border-radius:10px;font-size:12px}
+.btn-pen-warn{background:rgba(245,158,11,.16)!important;border-color:rgba(245,158,11,.45)!important;color:#fcd34d!important}
+.btn-pen-15{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.35)!important;color:#fecaca!important}
+.btn-pen-180{background:rgba(239,68,68,.16)!important;border-color:rgba(239,68,68,.45)!important;color:#fda4af!important}
+.btn-pen-undo{background:rgba(148,163,184,.12)!important;border-color:rgba(148,163,184,.35)!important;color:#cbd5e1!important}
+.penalty-advanced{margin-top:8px;padding:8px 10px;border:1px dashed #23324a;border-radius:12px}
+.theme-light .btn-pen-warn{color:#92400e!important}
+.theme-light .btn-pen-15,.theme-light .btn-pen-180{color:#991b1b!important}
+.theme-light .btn-pen-undo{color:#334155!important}
+
+
+.station-row-drag{cursor:default}
+.station-row-drag.dragging{opacity:.45}
+.drag-handle{display:inline-block;padding:4px 8px;border:1px solid #23324a;border-radius:8px;background:#101827;color:#9fb0c6;font-weight:800;cursor:grab;user-select:none}
+.theme-light .drag-handle{background:#fff;color:#5c6f88;border-color:#c9d6ea}
+
+
+.station-row-drag{cursor:default}
+.station-row-drag.dragging{opacity:.35;background:rgba(59,130,246,.12)!important}
+.station-row-ghost{position:fixed;pointer-events:none;z-index:99999;background:#101827;border:1px solid #3b82f6;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:10px 12px;color:#e7edf7;min-width:260px}
+.station-row-drop{outline:2px dashed #3b82f6;outline-offset:-2px;background:rgba(59,130,246,.08)!important}
+.theme-light .station-row-ghost{background:#fff;color:#122033;border-color:#2563eb;box-shadow:0 12px 32px rgba(37,99,235,.15)}
+
+
+.station-toggle{display:inline-flex;border:1px solid #23324a;border-radius:10px;overflow:hidden}
+.station-toggle button{padding:6px 10px;border:0;border-right:1px solid #23324a;border-radius:0;background:#101827;color:#9fb0c6}
+.station-toggle button:last-child{border-right:0}
+.station-toggle .is-on{background:rgba(34,197,94,.16)!important;color:#86efac!important}
+.station-toggle .is-off{background:rgba(239,68,68,.10)!important;color:#fca5a5!important}
+.theme-light .station-toggle button{background:#fff;color:#5c6f88}
+.theme-light .station-toggle .is-on{background:rgba(34,197,94,.12)!important;color:#166534!important}
+.theme-light .station-toggle .is-off{background:rgba(239,68,68,.08)!important;color:#991b1b!important}
+
+
+.station-state-btn{min-width:110px;font-weight:800}
+.station-state-on{background:rgba(34,197,94,.16)!important;border-color:rgba(34,197,94,.45)!important;color:#86efac!important}
+.station-state-off{background:rgba(239,68,68,.10)!important;border-color:rgba(239,68,68,.35)!important;color:#fca5a5!important}
+.station-order-row{display:flex;gap:6px}
+.station-order-row button{min-width:44px}
+
+
+#stationsOverlay{z-index:10050 !important}
+#stationsOverlay .modal{position:relative}
+.manager-row-drag{cursor:default}
+.manager-row-drag.dragging{opacity:.35;background:rgba(59,130,246,.10)!important}
+.manager-row-drop{outline:2px dashed #3b82f6;outline-offset:-2px;background:rgba(59,130,246,.08)!important}
+.manager-drag-handle{display:inline-block;padding:6px 10px;border:1px solid #23324a;border-radius:8px;background:#101827;color:#9fb0c6;font-weight:800;cursor:grab;user-select:none}
+.station-manager-ghost{position:fixed;pointer-events:none;z-index:10060;background:#101827;border:1px solid #3b82f6;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.35);padding:10px 12px;color:#e7edf7;min-width:260px}
+.theme-light .manager-drag-handle{background:#fff;color:#5c6f88;border-color:#c9d6ea}
+.theme-light .station-manager-ghost{background:#fff;color:#122033;border-color:#2563eb;box-shadow:0 12px 32px rgba(37,99,235,.15)}
+
+
+.penalty-actions.is-warning-only .btn-pen-time,
+.penalty-actions.is-warning-only .btn-pen-undo{display:none}
+
+.theme-light .phase-ex{background:#fff3cd;border:1px solid #f4b400;color:#8a5a00}
+
+/* Compact athlete cards */
+.card .head{padding:10px 12px}
+.card .body{padding:10px 12px}
+.badge{width:30px;height:30px;font-size:14px}
+.name{font-size:16px;line-height:1.1}
+.btnrow{gap:6px;margin-top:8px}
+.btnrow button{padding:8px 10px;min-height:36px}
+.penalty-actions{gap:6px;margin-top:6px}
+.penalty-actions button{padding:7px 9px;font-size:11px}
+.penalty-mini{margin-top:2px}
+.mono.big{font-size:22px;line-height:1}
+@media (min-width: 768px){
+  .card .head{padding:8px 10px}
+  .card .body{padding:8px 10px}
+  .name{font-size:15px}
+  .mono.big{font-size:20px}
+}
+
+</style>
+
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <div style="font-weight:900">HYROX Multi Timer — offline (compat v3)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <span class="pill">Gara: <b id="raceNamePill">—</b></span>
+          <span class="pill">Partenza: <b id="raceStartPill">—</b></span>
+          <span class="pill">Crono: <b id="raceClockPill">0:00:00</b></span>
+          <span class="pill">Stato: <b id="raceStatePill">PRONTA</b></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+        <button id="btnSetup" onclick="window.__hyroxOpenSetup()">Setup</button>
+        <button id="btnStartRace">Start gara</button>
+        <button id="btnPauseResume" disabled>Pausa</button>
+        <button id="btnExportResults" disabled>Export Risultati</button>
+        <button id="btnExportLog" disabled>Export LOG</button>
+        <button id="btnResetRace">Reset gara</button>
+        <button id="btnFullscreen">Fullscreen</button>
+      </div>
+    </div>
+    <div class="error" id="fatal"></div>
+    <div id="lastActionBar" class="last-action" style="display:none">
+      <div><div class="label">Ultimo click</div><div id="lastActionText" class="value">—</div></div>
+      <div id="lastActionAge" class="label">ora</div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="grid" id="cardsGrid"></section>
+
+  <section id="summaryWrap" style="padding:0 12px 18px">
+    <div class="card">
+      <div class="head">
+        <div style="font-weight:900">Riepilogo</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btnSummarySort" style="padding:8px 10px;border-radius:12px;font-size:12px">Ordine: Avanzamento</button>
+          <div class="muted" style="font-size:12px">live</div>
+        </div>
+      </div>
+      <div class="body" style="padding:0">
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Atleta</th><th>Fase</th>
+                <th style="text-align:left">RUN</th><th style="text-align:left">ROX</th><th style="text-align:left">EX</th>
+                <th style="text-align:left">Totale</th>
+              </tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;padding:10px 12px" id="autosaveHint">Autosave attivo.</div>
+    </div>
+  </section>
+
+
+  <section id="splitsWrap" style="padding:0 12px 18px">
+    <div class="card">
+      <div class="head">
+        <div style="font-weight:900">Intertempi per fase</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="btnSplitsTranspose" style="padding:8px 10px;border-radius:12px;font-size:12px">Vista: normale</button>
+          <div class="muted" style="font-size:12px">scroll orizzontale</div>
+        </div>
+      </div>
+      <div class="body" style="padding:0">
+        <div style="overflow:auto">
+          <table id="splitsTable">
+            <thead id="splitsHead"></thead>
+            <tbody id="splitsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;padding:10px 12px">
+        Ogni cella = durata della fase (da START fase a START fase successiva / FINISH).
+      </div>
+    </div>
+  </section>
+
+  
+  <section id="dashboardWrap" style="padding:0 12px 18px;display:none">
+    <div class="card">
+      <div class="head">
+        <div style="font-weight:900">Dashboard finale gara</div>
+        <div class="muted" style="font-size:12px">visibile quando tutti gli atleti finiscono</div>
+      </div>
+      <div class="body">
+        <div id="dashboardGrid" class="dashboard-grid"></div>
+      </div>
+    </div>
+  </section>
+
+<section id="roxSection" style="padding:0 12px 18px;display:none">
+    <details id="roxDetails" class="card" open>
+      <summary class="head" style="cursor:pointer;list-style:none">
+        <div style="font-weight:900">Rox Zone per atleta</div>
+        <div class="muted" style="font-size:12px">mostra / nascondi</div>
+      </summary>
+      <div class="body" style="padding:0">
+        <div style="overflow:auto">
+          <table id="roxTable">
+            <thead id="roxHead"></thead>
+            <tbody id="roxBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;padding:10px 12px">
+        Ogni cella Rox = durata della singola Rox Zone (mm:ss).
+      </div>
+    </details>
+  </section>
+
+  <section id="penaltiesWrap" style="padding:0 12px 18px">
+    <div class="card">
+      <div class="head">
+        <div style="font-weight:900">Infrazioni / Penalità gara</div>
+        <div class="muted" style="font-size:12px">tabella finale separata</div>
+      </div>
+      <div class="body" style="padding:0">
+        <div style="overflow:auto">
+          <table id="penaltiesTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Atleta</th>
+                <th>Stazione</th>
+                <th>Avvertimento / Penalità</th>
+                <th>Tempo</th>
+                <th>Registrata</th><th>Azione</th>
+              </tr>
+            </thead>
+            <tbody id="penaltiesBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;padding:10px 12px">
+        Warning e penalità sono registrati separatamente dalle tabelle attuali. Sulle stazioni EX prima serve un warning: le penalità tempo sulla stessa stazione sono consentite solo dopo l’avvertimento. Il tempo finale include automaticamente i secondi di penalità cumulati.
+      </div>
+    </div>
+  </section>
+
+
+<div class="overlay" id="stationsOverlay" style="display:none">
+  <div class="modal" style="width:min(1100px,96vw);height:min(88vh,960px);max-width:96vw">
+    <div class="modalHead">
+      <div style="font-weight:900">Configura stazioni</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnStationsCancel" onclick="window.__hyroxCloseStationsManager && window.__hyroxCloseStationsManager()">Annulla</button>
+        <button id="btnStationsSave" class="btn-load-athletes" onclick="window.__hyroxSaveStationsManager && window.__hyroxSaveStationsManager()">Salva stazioni</button>
+      </div>
+    </div>
+    <div class="body">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Attiva o disattiva le stazioni e cambia l’ordine. Le modifiche si applicano solo quando premi <b>Salva stazioni</b>.</div>
+      <div style="max-height:calc(88vh - 130px);overflow:auto;border:1px solid #23324a;border-radius:14px">
+        <table>
+          <thead><tr><th style="width:140px">Stato</th><th>Stazione</th><th style="width:160px">Ordine</th></tr></thead>
+          <tbody id="stationsManagerBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<div class="overlay" id="setupOverlay">
+  <div class="modal">
+    <div class="modalHead">
+      <div style="font-weight:900">Setup</div>
+      <button onclick="window.__hyroxCloseSetup()" id="btnLoadAthletes" class="btn-load-athletes">Carica ATLETI</button>
+    </div>
+    <div class="body">
+      <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:6px">Nome gara</div>
+      <div style="display:flex;gap:10px;align-items:flex-end">
+        <div style="flex:1">
+          <input id="raceName" placeholder="Es. Sim Hyrox Gattinara">
+        </div>
+        <div style="width:110px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin:0 0 6px">Rox</div>
+          <select id="roxMode" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid #23324a;background:#101827;color:#e7edf7;outline:none">
+            <option value="no">No</option>
+            <option value="yes">Sì</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-end;margin:8px 0 12px">
+        <div style="width:140px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin:0 0 6px">Tema</div>
+          <select id="themeMode" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid #23324a;background:#101827;color:#e7edf7;outline:none">
+            <option value="dark">Scuro</option>
+            <option value="light">Chiaro</option>
+            <option value="auto">Auto</option>
+          </select>
+        </div>
+        <div style="width:140px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin:0 0 6px">Modalità</div>
+          <select id="viewMode" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid #23324a;background:#101827;color:#e7edf7;outline:none">
+            <option value="setup">Setup</option>
+            <option value="gara">Gara</option>
+          </select>
+        </div>
+        <div id="setupHint" class="muted" style="font-size:12px;flex:1">
+          Import CSV: Nome (1 colonna) oppure Numero;Nome
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;font-weight:800;margin:14px 0 6px">Stazioni / esercizi</div>
+      <div class="muted" style="font-size:12px;margin-bottom:8px">Gestisci esercizi, attivazione e ordine in una schermata dedicata. Il timer, le Rox Zone e l’export si adattano automaticamente.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button id="btnOpenStationsManager" onclick="window.__hyroxOpenStationsManager && window.__hyroxOpenStationsManager()">Configura stazioni</button>
+        <span id="stationsSummaryText" class="muted" style="font-size:12px">—</span>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button id="btnImportCsv">Import atleti CSV</button>
+        <input id="fileCsv" type="file" accept=".csv,text/csv" style="display:none">
+        <button id="btnFillDemo">Precompila 4 nomi</button>
+        <button id="btnClearNames">Svuota</button>
+      </div>
+      <div style="max-height:360px;overflow:auto;border:1px solid #23324a;border-radius:14px">
+        <table>
+          <thead><tr><th style="width:60px">#</th><th style="width:54px">Col</th><th>Nome atleta</th></tr></thead>
+          <tbody id="athletesTableBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  function ov(){ return document.getElementById("setupOverlay"); }
+  window.__hyroxOpenSetup = function(){
+    var o = ov(); if(!o) return;
+    if(o.className.indexOf("show")===-1) o.className = (o.className ? (o.className + " ") : "") + "show";
+    o.style.display = "block";
+  };
+  window.__hyroxCloseSetup = function(){
+    var o = ov(); if(!o) return;
+    o.className = o.className.replace(/\bshow\b/g,"").replace(/\s+/g," ").trim();
+    o.style.display = "none";
+  };
+  // Close setup only when clicking on the dark backdrop (not when interacting inside)
+  document.addEventListener("DOMContentLoaded", function(){
+    var ov = document.getElementById("setupOverlay");
+    if(ov){
+      var evt = ("onpointerdown" in window) ? "pointerdown" : (("ontouchstart" in window) ? "touchstart" : "mousedown");
+      ov.addEventListener(evt, function(e){
+        if(e && e.target === ov){
+          window.__hyroxCloseSetup && window.__hyroxCloseSetup();
+        }
+      }, true);
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", function(){
+    var b = document.getElementById("btnSetup");
+    if(b) b.onclick = function(){ window.__hyroxOpenSetup(); };
+  });
+
+    if(btnFullscreen){
+      btnFullscreen.onclick = function(){
+        if(!document.fullscreenElement){
+          var el = document.documentElement;
+          if(el.requestFullscreen) el.requestFullscreen();
+        }else{
+          if(document.exitFullscreen) document.exitFullscreen();
+        }
+      };
+      document.addEventListener("fullscreenchange", function(){
+        if(document.fullscreenElement){
+          btnFullscreen.textContent = "Esci Fullscreen";
+        }else{
+          btnFullscreen.textContent = "Fullscreen";
+        }
+      });
+    }
+
+})();
+</script>
+
+<script>
+(function(){
+  function showFatal(msg){
+    var box = document.getElementById("fatal");
+    box.style.display = "block";
+    box.textContent = msg;
+  }
+
+  try{
+    var STORAGE_KEY = "hyrox_multi_timer_compat_v15";
+    // Fasi HYROX (con o senza Rox Zone IN/OUT)
+    var OFFICIAL_STATIONS = ["Ski","Push","SPull","Burpee BJ","Row","Farmers","Sandbag","Wall Balls"];
+    var PHASES = [];
+    var RUN_INDEXES = [];
+    var ROX_INDEXES = [];
+    var EX_INDEXES = [];
+
+    function defaultStationsConfig(){
+      var arr = [];
+      for(var i=0;i<OFFICIAL_STATIONS.length;i++){
+        arr.push({name: OFFICIAL_STATIONS[i], enabled: true});
+      }
+      return arr;
+    }
+
+    function normalizeStationsConfig(cfg){
+      if(!Array.isArray(cfg) || !cfg.length) return defaultStationsConfig();
+      var out = [];
+      for(var i=0;i<cfg.length;i++){
+        var item = cfg[i] || {};
+        if(item.name) out.push({name: String(item.name), enabled: item.enabled !== false});
+      }
+      // ensure uniqueness and keep only official names
+      var used = {};
+      var filtered = [];
+      for(var j=0;j<out.length;j++){
+        if(OFFICIAL_STATIONS.indexOf(out[j].name) === -1) continue;
+        if(used[out[j].name]) continue;
+        used[out[j].name] = true;
+        filtered.push(out[j]);
+      }
+      // append any missing official stations disabled at end to keep table complete
+      for(var k=0;k<OFFICIAL_STATIONS.length;k++){
+        if(!used[OFFICIAL_STATIONS[k]]){
+          filtered.push({name: OFFICIAL_STATIONS[k], enabled: false});
+        }
+      }
+      return filtered;
+    }
+
+    function selectedStations(){
+      var cfg = normalizeStationsConfig(state.stationsConfig);
+      var out = [];
+      for(var i=0;i<cfg.length;i++){
+        if(cfg[i].enabled) out.push(cfg[i].name);
+      }
+      return out;
+    }
+
+    function hasAnySelectedStation(){
+      return selectedStations().length > 0;
+    }
+
+    function buildPhases(roxEnabled){
+      var stations = selectedStations();
+      var out = [];
+      for(var i=0;i<stations.length;i++){
+        out.push("RUN " + (i+1));
+        if(roxEnabled){
+          out.push("RZ In " + stations[i]);
+          out.push(stations[i]);
+          out.push("RZ Out " + stations[i]);
+        }else{
+          out.push(stations[i]);
+        }
+      }
+      return out;
+    }
+
+    function recomputePhaseIndexes(){
+      RUN_INDEXES = [];
+      ROX_INDEXES = [];
+      EX_INDEXES = [];
+      for(var i=0;i<PHASES.length;i++){
+        var p = PHASES[i];
+        if(/^RUN\b/i.test(p)) RUN_INDEXES.push(i);
+        else if(/^RZ\b/i.test(p)) ROX_INDEXES.push(i);
+        else EX_INDEXES.push(i);
+      }
+    }
+
+    function setPhasesFromState(){
+      state.stationsConfig = normalizeStationsConfig(state.stationsConfig);
+      PHASES = buildPhases(!!state.roxEnabled);
+      recomputePhaseIndexes();
+    }
+    function resolveThemeMode(){
+      if(state.themeMode === "auto"){
+        try{
+          return (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+        }catch(e){ return "dark"; }
+      }
+      return state.themeMode || "light";
+    }
+
+    function applyThemeAndMode(){
+      var theme = resolveThemeMode();
+      document.body.classList.remove("theme-light","theme-dark","mode-gara","mode-setup");
+      document.body.classList.add(theme === "light" ? "theme-light" : "theme-dark");
+      document.body.classList.add(state.viewMode === "gara" ? "mode-gara" : "mode-setup");
+    }
+
+    function getPhaseKind(name){
+      name = name || "";
+      if(name === "FINISH") return "finish";
+      if(/^RUN\b/i.test(name)) return "run";
+      if(/^RZ\b/i.test(name)) return "rox";
+      if(name && name !== "—") return "ex";
+      return "";
+    }
+
+    function setLastAction(text){
+      state.lastActionText = text || "";
+      state.lastActionEpochMs = nowEpoch();
+    }
+
+    var athleteClickLocks = {};
+    function penaltySecondsForAthlete(num){
+      if(!Array.isArray(state.penalties)) state.penalties = [];
+      var total = 0;
+      for(var i=0;i<state.penalties.length;i++){
+        if(state.penalties[i].athleteNum === num){
+          total += Number(state.penalties[i].seconds || 0);
+        }
+      }
+      return total;
+    }
+
+    function finalTotalForAthlete(a, nowMs){
+      return totalForAthlete(a, nowMs) + penaltySecondsForAthlete(a.num);
+    }
+
+    function currentStationForAthlete(a){
+      var idx = currentPhaseIndex(a);
+      if(a.finishMs!=null) return "FINISH";
+      if(idx===0) return "PRE-START";
+      return PHASES[idx-1];
+    }
+
+    
+    function hasWarningForStation(athleteNum, station){
+      if(!Array.isArray(state.penalties)) state.penalties = [];
+      for(var i=0;i<state.penalties.length;i++){
+        var p = state.penalties[i];
+        if(p.athleteNum === athleteNum && p.station === station && p.level === 'warning'){
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function stationPenaltyUIState(a){
+      var station = currentStationForAthlete(a);
+      var isExerciseStation = !!station && !/^RUN\b/i.test(station) && !/^RZ\b/i.test(station) && station !== 'PRE-START' && station !== 'FINISH';
+      var hasWarning = isExerciseStation ? hasWarningForStation(a.num, station) : false;
+      return {station: station, isExerciseStation: isExerciseStation, hasWarning: hasWarning};
+    }
+
+
+function countPenaltyEntries(athleteNum, station, code){
+      if(!Array.isArray(state.penalties)) state.penalties = [];
+      var c = 0;
+      for(var i=0;i<state.penalties.length;i++){
+        var p = state.penalties[i];
+        if(p.athleteNum === athleteNum && p.station === station && p.code === code){ c++; }
+      }
+      return c;
+    }
+
+    function getPenaltyOptionsHTML(station){
+      station = station || "";
+      var opts = [];
+      function add(v,t){ opts.push('<option value="'+v+'">'+t+'</option>'); }
+
+      // Generic always available
+      add('warning', 'Warning / avvertimento');
+      add('p15', '+15 sec');
+      add('p30', '+30 sec');
+      add('p120', '+2 min');
+      add('dq_note', 'DQ / review (nota, 0 sec)');
+
+      if(/^RUN\b/i.test(station)){
+        add('p180', 'Run / lap mancante (+3 min x qty)');
+        add('conduct_2m', 'Spitting / littering / poor conduct (+2 min)');
+        return opts.join('');
+      }
+
+      if(/^RZ\b/i.test(station)){
+        add('p15', 'Rox confusion / generic +15 sec');
+        add('p120', 'Condotta / littering in Rox (+2 min)');
+        return opts.join('');
+      }
+
+      if(/^Ski/i.test(station) || /^Row/i.test(station) || /^Burpee/i.test(station)){
+        add('protocol_station', 'Protocollo stazione (1° warning, poi +15s)');
+        add('severity_note', 'Leaving early / severity review');
+        return opts.join('');
+      }
+
+      if(/^Push/i.test(station) || /^SPull/i.test(station)){
+        add('protocol_station', 'Protocollo stazione (1° warning, poi +15s)');
+        add('missing_lane', 'Lane mancanti (+3 min x qty)');
+        return opts.join('');
+      }
+
+      if(/^Farmers/i.test(station)){
+        add('missing_lane', 'Lap mancanti (+3 min x qty)');
+        add('farm_return', 'Kettlebell return errato (+30s)');
+        add('protocol_station', 'Protocollo stazione (warning/+15s)');
+        return opts.join('');
+      }
+
+      if(/^Sandbag/i.test(station)){
+        add('protocol_station', 'Protocollo stazione (warning/+15s)');
+        add('sand_return', 'Rientro sandbag errato (+30s)');
+        add('sand_drop', 'Sandbag down (1ª +15s, 2ª = DQ nota)');
+        return opts.join('');
+      }
+
+      if(/^Wall Balls/i.test(station)){
+        add('wb_reps', 'Missing reps Wall Balls (+15s x qty)');
+        add('chalk', 'Powdered chalk (+2 min)');
+        add('equipment_note', 'Peso/attrezzo errato (review/DQ nota)');
+        return opts.join('');
+      }
+
+      // fallback generic
+      add('protocol_station', 'Protocollo stazione (warning/+15s)');
+      add('p180', '+3 min x qty');
+      return opts.join('');
+    }
+
+    function registerPenaltyForAthlete(a, code, qty){
+      if(!a || !a.name || !a.name.trim()) return;
+      qty = Math.max(1, parseInt(qty || 1, 10) || 1);
+      var station = currentStationForAthlete(a);
+      var seconds = 0;
+      var label = '';
+      var level = 'penalty';
+      var isExerciseStation = !!station && !/^RUN\b/i.test(station) && !/^RZ\b/i.test(station) && station !== 'PRE-START' && station !== 'FINISH';
+      var isDirectTimePenalty = (code === 'p15' || code === 'p30' || code === 'p120' || code === 'p180' || code === 'missing_lane' || code === 'wb_reps' || code === 'farm_return' || code === 'sand_return' || code === 'sand_drop');
+      if(isExerciseStation && isDirectTimePenalty && !hasWarningForStation(a.num, station)){
+        setLastAction('Prima serve WARNING • ' + a.name.trim() + ' • ' + station);
+        save();
+        render();
+        return;
+      }
+
+      if(code === 'warning'){
+        label = 'Warning';
+        level = 'warning';
+      }else if(code === 'p15'){
+        label = '+15 sec';
+        seconds = 15 * qty;
+      }else if(code === 'p30'){
+        label = '+30 sec';
+        seconds = 30 * qty;
+      }else if(code === 'p120' || code === 'conduct_2m' || code === 'chalk'){
+        label = (code === 'chalk') ? 'Powdered chalk' : '+2 min';
+        seconds = 120 * qty;
+      }else if(code === 'p180' || code === 'missing_lane'){
+        label = (code === 'missing_lane') ? ('Lane/lap mancanti x'+qty) : ('+3 min x'+qty);
+        seconds = 180 * qty;
+      }else if(code === 'wb_reps'){
+        label = 'Wall Balls missing reps x'+qty;
+        seconds = 15 * qty;
+      }else if(code === 'farm_return'){
+        label = 'Farmers return errato';
+        seconds = 30;
+      }else if(code === 'sand_return'){
+        label = 'Sandbag return errato';
+        seconds = 30;
+      }else if(code === 'sand_drop'){
+        var drops = countPenaltyEntries(a.num, station, 'sand_drop');
+        if(drops === 0){
+          label = 'Sandbag down (1ª)';
+          seconds = 15;
+        }else{
+          label = 'Sandbag down (2ª = review/DQ)';
+          seconds = 0;
+          level = 'note';
+        }
+      }else if(code === 'protocol_station'){
+        var count = countPenaltyEntries(a.num, station, 'protocol_station');
+        if(count === 0){
+          label = 'Warning protocollo stazione';
+          seconds = 0;
+          level = 'warning';
+        }else{
+          label = 'Penalty protocollo stazione';
+          seconds = 15;
+        }
+      }else if(code === 'dq_note'){
+        label = 'DQ / review';
+        seconds = 0;
+        level = 'note';
+      }else if(code === 'severity_note' || code === 'equipment_note'){
+        label = 'Review / possible DQ';
+        seconds = 0;
+        level = 'note';
+      }else{
+        label = code || 'Penalty';
+      }
+
+      var entry = {
+        id: 'pen_' + nowEpoch() + '_' + a.num + '_' + state.penalties.length,
+        athleteNum: a.num,
+        athleteName: a.name.trim(),
+        station: station,
+        code: code,
+        label: label,
+        level: level,
+        seconds: seconds,
+        epochMs: nowEpoch()
+      };
+      state.penalties.push(entry);
+      setLastAction(a.name.trim() + ' • ' + station + ' • ' + label + (seconds ? (' ('+fmtMS(seconds*1000)+')') : ''));
+      save();
+      buildPenaltiesTable();
+      render();
+    }
+
+    function undoLastPenaltyForAthlete(a){
+      if(!a) return;
+      for(var i=state.penalties.length-1;i>=0;i--){
+        if(state.penalties[i].athleteNum === a.num){
+          var removed = state.penalties.splice(i,1)[0];
+          setLastAction('UNDO PENALITÀ • ' + a.name.trim() + ' • ' + (removed ? removed.label : ''));
+          save();
+          buildPenaltiesTable();
+          render();
+          return;
+        }
+      }
+      setLastAction('NESSUNA PENALITÀ DA ANNULLARE • ' + (a.name ? a.name.trim() : ''));
+      save();
+      render();
+    }
+    window.__hyroxUndoPenaltyAthlete = function(num){ undoLastPenaltyForAthlete(state.athletes[(Number(num)||1)-1]); };
+
+
+
+    function buildPenaltiesTable(){
+      if(!Array.isArray(state.penalties)) state.penalties = [];
+      if(!penaltiesBody) return;
+      penaltiesBody.innerHTML = '';
+      if(!state.penalties || !state.penalties.length){
+        var tr0 = document.createElement('tr');
+        tr0.innerHTML = '<td colspan="7" class="muted" style="padding:12px">Nessuna infrazione registrata.</td>';
+        penaltiesBody.appendChild(tr0);
+        return;
+      }
+      for(var i=0;i<state.penalties.length;i++){
+        var p = state.penalties[i];
+        var cls = (p.level === 'warning') ? 'penalty-warning' : ((p.level === 'note') ? 'penalty-noteonly' : 'penalty-time');
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="mono">'+(i+1)+'</td>' +
+          '<td>'+escapeHtml(p.athleteName || '')+'</td>' +
+          '<td>'+escapeHtml(p.station || '')+'</td>' +
+          '<td><span class="penalty-badge '+cls+'">'+escapeHtml(p.label || '')+'</span></td>' +
+          '<td class="mono" style="text-align:left">'+((p.seconds && p.seconds>0) ? ('+'+fmtMS(p.seconds*1000)) : '—')+'</td>' +
+          '<td class="mono" style="text-align:left">'+fmtWall(new Date(p.epochMs || nowEpoch()).toISOString())+'</td>' +
+          '<td><button class="btn-pen-undo" onclick="window.__hyroxUndoPenaltyAthlete && window.__hyroxUndoPenaltyAthlete('+p.athleteNum+')">Undo atleta</button></td>';
+        penaltiesBody.appendChild(tr);
+      }
+    }
+
+
+    var COLORS = ["#60a5fa","#34d399","#fbbf24","#fb7185","#a78bfa","#22c55e","#38bdf8","#f97316","#e879f9","#fda4af","#84cc16","#f472b6","#2dd4bf","#facc15","#93c5fd","#fb923c","#c4b5fd","#86efac","#67e8f9","#fde68a"];
+
+    function el(id){ return document.getElementById(id); }
+
+    var raceNameInput = el("raceName");
+    var roxModeSelect = el("roxMode");
+    var themeModeSelect = el("themeMode");
+    var viewModeSelect = el("viewMode");
+    var raceNamePill  = el("raceNamePill");
+    var raceStartPill = el("raceStartPill");
+    var raceClockPill = el("raceClockPill");
+    var raceStatePill = el("raceStatePill");
+
+    var setupOverlay = el("setupOverlay");
+    var btnStartRace = el("btnStartRace");
+    var btnPauseResume = el("btnPauseResume");
+    var btnExportResults = el("btnExportResults");
+    var btnExportLog = el("btnExportLog");
+    var btnResetRace = el("btnResetRace");
+    var btnFullscreen = el("btnFullscreen");
+    // --- RESET GARA: doppia conferma visiva (no popup) ---
+    function disarmReset(){
+      state.resetArmed = false;
+      state.resetArmUntil = 0;
+      if(btnResetRace){
+        btnResetRace.classList.remove("btn-reset-armed");
+        btnResetRace.textContent = "Reset gara";
+      }
+    }
+
+    function armReset(){
+      state.resetArmed = true;
+      state.resetArmUntil = nowEpoch() + 6000; // 6s window
+      if(btnResetRace){
+        btnResetRace.classList.add("btn-reset-armed");
+      }
+      updateResetButtonCountdown();
+      autosaveHint.textContent = "⚠️ Premi di nuovo RESET entro 6 secondi per azzerare TUTTO.";
+    }
+
+    function updateResetButtonCountdown(){
+      if(!btnResetRace) return;
+      if(!state.resetArmed){
+        btnResetRace.textContent = "Reset gara";
+        return;
+      }
+      var left = Math.max(0, state.resetArmUntil - nowEpoch());
+      var sec = Math.ceil(left/1000);
+      btnResetRace.textContent = sec>0 ? ("CONFERMA RESET ("+sec+"s)") : "CONFERMA RESET";
+      if(left<=0){
+        disarmReset();
+        autosaveHint.textContent = "Autosave attivo.";
+      }
+    }
+
+    function handleResetClick(){
+      if(!btnResetRace || btnResetRace.disabled) return;
+      if(!state.resetArmed){
+        armReset();
+        save();
+        return;
+      }
+      if(nowEpoch() <= state.resetArmUntil){
+        resetRace();
+        disarmReset();
+        autosaveHint.textContent = "Reset completato.";
+        setTimeout(function(){ autosaveHint.textContent = "Autosave attivo."; }, 1200);
+        save();
+        render();
+      }else{
+        disarmReset();
+        autosaveHint.textContent = "Autosave attivo.";
+        save();
+      }
+    }
+
+    var btnSummarySort = el("btnSummarySort");
+
+    var athletesTableBody = el("athletesTableBody");
+    var stationsTableBody = el("stationsTableBody");
+    var btnOpenStationsManager = el("btnOpenStationsManager");
+    var stationsSummaryText = el("stationsSummaryText");
+    var stationsOverlay = el("stationsOverlay");
+    var stationsManagerBody = el("stationsManagerBody");
+    var btnStationsCancel = el("btnStationsCancel");
+    var btnStationsSave = el("btnStationsSave");
+    if(stationsOverlay){
+      var stEvt = ("onpointerdown" in window) ? "pointerdown" : (("ontouchstart" in window) ? "touchstart" : "mousedown");
+      stationsOverlay.addEventListener(stEvt, function(e){
+        if(e && e.target === stationsOverlay){
+          if(window.__hyroxCloseStationsManager) window.__hyroxCloseStationsManager();
+        }
+      }, true);
+    }
+    var cardsGrid = el("cardsGrid");
+    var summaryBody = el("summaryBody");
+    var splitsHead = el("splitsHead");
+    var splitsBody = el("splitsBody");
+    var roxSection = el("roxSection");
+    var roxHead = el("roxHead");
+    var roxBody = el("roxBody");
+    var btnSplitsTranspose = el("btnSplitsTranspose");
+    var autosaveHint = el("autosaveHint");
+    var penaltiesBody = el("penaltiesBody");
+    var lastActionBar = el("lastActionBar");
+    var lastActionText = el("lastActionText");
+    var lastActionAge = el("lastActionAge");
+    var dashboardWrap = el("dashboardWrap");
+    var dashboardGrid = el("dashboardGrid");
+
+    var btnImportCsv = el("btnImportCsv");
+    var fileCsv = el("fileCsv");
+    var btnFillDemo = el("btnFillDemo");
+    var btnClearNames = el("btnClearNames");
+
+    var state = {
+      summarySort: "progress",
+      themeMode: "light",
+      viewMode: "setup",
+      lastActionText: "",
+      lastActionEpochMs: 0,
+      splitsTransposed: false,
+      roxEnabled: false,
+      penalties: [],
+      stationsConfig: defaultStationsConfig(),
+      resetArmed: false,
+      resetArmUntil: 0,
+      raceName: "",
+      raceStartISO: null,
+      raceStartEpochMs: null,
+      paused: false,
+      pauseStartEpochMs: null,
+      pausedAccumMs: 0,
+      eventLog: [],
+      athletes: (function(){
+        var arr = [];
+        for(var i=0;i<20;i++){
+          arr.push({num:i+1, name:"", phaseStartsMs:[], finishMs:null, history:[]});
+        }
+        return arr;
+      })()
+    };
+
+    function nowEpoch(){ return new Date().getTime(); }
+    function isRaceStarted(){ return state.raceStartEpochMs !== null; }
+    function fmt2(n){ return (n<10?"0":"")+n; }
+    function fmtMS(ms){
+      ms = Math.max(0, Math.floor(ms));
+      var s = Math.floor(ms/1000);
+      var mm = Math.floor(s/60);
+      var ss = s%60;
+      return mm + ":" + (ss<10?"0":"") + ss;
+    }
+
+    function fmtHMS(ms){
+      ms = Math.max(0, Math.floor(ms));
+      var s = Math.floor(ms/1000);
+      var hh = Math.floor(s/3600);
+      var mm = Math.floor((s%3600)/60);
+      var ss = s%60;
+      return hh + ":" + fmt2(mm) + ":" + fmt2(ss);
+    }
+    function fmtWall(iso){
+      if(!iso) return "—";
+      var d = new Date(iso);
+      return fmt2(d.getDate()) + "/" + fmt2(d.getMonth()+1) + "/" + d.getFullYear() + " " + fmt2(d.getHours()) + ":" + fmt2(d.getMinutes()) + ":" + fmt2(d.getSeconds());
+    }
+    function sanitizeFileName(s){
+      s = (s || "Gara").replace(/[^\w\s-]/g,"").replace(/\s+/g,"_");
+      return s.substring(0,60) || "Gara";
+    }
+    function csvEscape(s){
+      s = String(s==null?"":s);
+      if(/[;\n\r"]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+    function downloadText(filename, content, mime){
+      var blob = new Blob([content], {type:mime});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.parentNode.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function raceElapsedMs(){
+      if(!isRaceStarted()) return 0;
+      var now = state.paused ? (state.pauseStartEpochMs || nowEpoch()) : nowEpoch();
+      return Math.max(0, now - state.raceStartEpochMs - state.pausedAccumMs);
+    }
+
+    function save(){
+      try{
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        autosaveHint.textContent = "Autosave attivo (salvato).";
+        setTimeout(function(){ autosaveHint.textContent = "Autosave attivo."; }, 700);
+      }catch(e){
+        autosaveHint.textContent = "Autosave NON disponibile.";
+      }
+    }
+
+    function load(){
+      try{
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return false;
+        var p = JSON.parse(raw);
+        state.raceName = p.raceName || "";
+        state.raceStartISO = p.raceStartISO || null;
+        state.raceStartEpochMs = (p.raceStartEpochMs!=null) ? p.raceStartEpochMs : (state.raceStartISO ? Date.parse(state.raceStartISO) : null);
+        state.paused = !!p.paused;
+        state.pauseStartEpochMs = p.pauseStartEpochMs || null;
+        state.pausedAccumMs = p.pausedAccumMs || 0;
+        state.eventLog = p.eventLog && p.eventLog.length ? p.eventLog : [];
+        state.summarySort = p.summarySort || state.summarySort || "progress";
+        state.splitsTransposed = !!p.splitsTransposed;
+        state.themeMode = p.themeMode || state.themeMode || "light";
+        state.viewMode = p.viewMode || state.viewMode || "setup";
+        state.lastActionText = p.lastActionText || "";
+        state.lastActionEpochMs = p.lastActionEpochMs || 0;
+        state.roxEnabled = (p.roxEnabled===undefined) ? false : !!p.roxEnabled;
+        state.penalties = Array.isArray(p.penalties) ? p.penalties : [];
+        state.stationsConfig = normalizeStationsConfig(p.stationsConfig || state.stationsConfig);
+        if(p.athletes && p.athletes.length === 20){
+          for(var i=0;i<20;i++){
+            state.athletes[i].name = p.athletes[i].name || "";
+            state.athletes[i].phaseStartsMs = p.athletes[i].phaseStartsMs || [];
+            state.athletes[i].finishMs = (p.athletes[i].finishMs!=null)?p.athletes[i].finishMs:null;
+            state.athletes[i].history = p.athletes[i].history || [];
+          }
+        }
+        return true;
+      }catch(e){ return false; }
+    }
+
+    window.__hyroxOpenSetup = function(){ setupOverlay.classList.add("show"); };
+    window.__hyroxCloseSetup = function(){ setupOverlay.classList.remove("show"); };
+
+    function buildAthletesTable(){
+      athletesTableBody.innerHTML = "";
+      for(var i=0;i<state.athletes.length;i++){
+        (function(a){
+          var tr = document.createElement("tr");
+          var tdNum = document.createElement("td");
+          tdNum.className = "mono";
+          tdNum.textContent = a.num;
+
+          var tdCol = document.createElement("td");
+          var dot = document.createElement("span");
+          dot.className = "dot";
+          dot.style.background = COLORS[(a.num-1)%COLORS.length];
+          tdCol.appendChild(dot);
+
+          var tdName = document.createElement("td");
+          var inp = document.createElement("input");
+          inp.value = a.name || "";
+          inp.placeholder = (a.num<=4) ? "Nome atleta" : "—";
+          inp.oninput = function(){
+            a.name = inp.value;
+            save();
+            render();
+          };
+          tdName.appendChild(inp);
+
+          tr.appendChild(tdNum);
+          tr.appendChild(tdCol);
+          tr.appendChild(tdName);
+          athletesTableBody.appendChild(tr);
+        })(state.athletes[i]);
+      }
+    }
+
+    function buildStationsTable(){
+      if(!stationsTableBody) return;
+      state.stationsConfig = normalizeStationsConfig(state.stationsConfig);
+      stationsTableBody.innerHTML = "";
+      var dragGhost = null;
+
+      function clearDropMarks(){
+        var rows = stationsTableBody.querySelectorAll("tr");
+        for(var x=0;x<rows.length;x++) rows[x].classList.remove("station-row-drop");
+      }
+
+      function moveStation(from, to){
+        if(isRaceStarted()) return;
+        if(from === to || from < 0 || to < 0 || from >= state.stationsConfig.length || to >= state.stationsConfig.length) return;
+        var item = state.stationsConfig.splice(from, 1)[0];
+        state.stationsConfig.splice(to, 0, item);
+        setPhasesFromState();
+        save();
+        render();
+      }
+
+      for(var i=0;i<state.stationsConfig.length;i++){
+        (function(idx){
+          var s = state.stationsConfig[idx];
+          var tr = document.createElement("tr");
+          tr.className = "station-row-drag";
+          tr.setAttribute("data-stidx", idx);
+
+          var tdOn = document.createElement("td");
+          var selState = document.createElement("select");
+          selState.style.minWidth = "96px";
+          selState.disabled = isRaceStarted();
+          selState.innerHTML = '<option value="on">Attiva</option><option value="off">Disattiva</option>';
+          selState.value = s.enabled ? "on" : "off";
+          selState.onchange = function(ev){
+            ev.stopPropagation();
+            if(isRaceStarted()) return;
+            s.enabled = (selState.value === "on");
+            setPhasesFromState();
+            save();
+            render();
+          };
+          tdOn.appendChild(selState);
+
+          var tdName = document.createElement("td");
+          tdName.textContent = s.name + (s.enabled ? "" : " (off)");
+
+          var tdOrder = document.createElement("td");
+          var handle = document.createElement("span");
+          handle.className = "drag-handle";
+          handle.textContent = "⋮⋮";
+          handle.title = "Trascina per riordinare";
+          handle.draggable = !isRaceStarted();
+          tdOrder.appendChild(handle);
+
+          handle.addEventListener("dragstart", function(ev){
+            if(isRaceStarted()) return;
+            tr.classList.add("dragging");
+            ev.dataTransfer.effectAllowed = "move";
+            ev.dataTransfer.setData("text/plain", String(idx));
+            try{
+              dragGhost = document.createElement("div");
+              dragGhost.className = "station-row-ghost";
+              dragGhost.textContent = s.name;
+              document.body.appendChild(dragGhost);
+              if(ev.dataTransfer.setDragImage){
+                ev.dataTransfer.setDragImage(dragGhost, 20, 20);
+              }
+            }catch(e){}
+          });
+
+          handle.addEventListener("dragend", function(){
+            tr.classList.remove("dragging");
+            clearDropMarks();
+            if(dragGhost && dragGhost.parentNode) dragGhost.parentNode.removeChild(dragGhost);
+            dragGhost = null;
+          });
+
+          tr.addEventListener("dragover", function(ev){
+            if(isRaceStarted()) return;
+            ev.preventDefault();
+            clearDropMarks();
+            tr.classList.add("station-row-drop");
+          });
+
+          tr.addEventListener("dragleave", function(){
+            tr.classList.remove("station-row-drop");
+          });
+
+          tr.addEventListener("drop", function(ev){
+            if(isRaceStarted()) return;
+            ev.preventDefault();
+            clearDropMarks();
+            var from = parseInt(ev.dataTransfer.getData("text/plain"), 10);
+            var to = idx;
+            if(isNaN(from) || isNaN(to)) return;
+            moveStation(from, to);
+          });
+
+          tr.appendChild(tdOn);
+          tr.appendChild(tdName);
+          tr.appendChild(tdOrder);
+          stationsTableBody.appendChild(tr);
+        })(i);
+      }
+    }
+
+    
+    var stationsDraft = null;
+
+    function summarizeStations(){
+      var stations = selectedStations();
+      if(!stations.length) return "Nessuna stazione attiva";
+      return stations.length + " attive: " + stations.join(" • ");
+    }
+
+    function openStationsManager(){
+      if(isRaceStarted()) return;
+      stationsDraft = JSON.parse(JSON.stringify(normalizeStationsConfig(state.stationsConfig)));
+      buildStationsManagerTable();
+      if(setupOverlay){ setupOverlay.style.visibility = "hidden"; }
+      if(stationsOverlay){
+        stationsOverlay.classList.add("show");
+        stationsOverlay.style.display = "block";
+      }
+    }
+
+    function closeStationsManager(){
+      if(stationsOverlay){
+        stationsOverlay.classList.remove("show");
+        stationsOverlay.style.display = "none";
+      }
+      if(setupOverlay){ setupOverlay.style.visibility = ""; }
+      stationsDraft = null;
+    }
+
+    function buildStationsManagerTable(){
+      if(!stationsManagerBody) return;
+      if(!Array.isArray(stationsDraft)) stationsDraft = JSON.parse(JSON.stringify(normalizeStationsConfig(state.stationsConfig)));
+      stationsManagerBody.innerHTML = "";
+      var dragGhost = null;
+
+      function clearDropMarks(){
+        var rows = stationsManagerBody.querySelectorAll("tr");
+        for(var x=0;x<rows.length;x++) rows[x].classList.remove("manager-row-drop");
+      }
+
+      function moveDraft(from, to){
+        if(from === to || from < 0 || to < 0 || from >= stationsDraft.length || to >= stationsDraft.length) return;
+        var item = stationsDraft.splice(from, 1)[0];
+        stationsDraft.splice(to, 0, item);
+        buildStationsManagerTable();
+      }
+
+      for(var i=0;i<stationsDraft.length;i++){
+        (function(idx){
+          var s = stationsDraft[idx];
+          var tr = document.createElement("tr");
+          tr.className = "manager-row-drag";
+          tr.setAttribute("data-stidx", idx);
+
+          var tdState = document.createElement("td");
+          var btnState = document.createElement("button");
+          btnState.type = "button";
+          btnState.className = "station-state-btn " + (s.enabled ? "station-state-on" : "station-state-off");
+          btnState.textContent = s.enabled ? "Attiva" : "Disattiva";
+          btnState.onclick = function(ev){
+            ev.preventDefault();
+            ev.stopPropagation();
+            
+            if(s.enabled){
+              // disabling -> move to end
+              s.enabled = false;
+              var item = stationsDraft.splice(idx,1)[0];
+              stationsDraft.push(item);
+            }else{
+              // enabling -> move after last enabled
+              s.enabled = true;
+              var item = stationsDraft.splice(idx,1)[0];
+              var pos = 0;
+              for(var j=0;j<stationsDraft.length;j++){
+                if(stationsDraft[j].enabled) pos = j+1;
+              }
+              stationsDraft.splice(pos,0,item);
+            }
+            buildStationsManagerTable();
+
+          };
+          tdState.appendChild(btnState);
+
+          var tdName = document.createElement("td");
+          tdName.textContent = s.name + (s.enabled ? "" : " (off)");
+
+          var tdOrder = document.createElement("td");
+          var handle = document.createElement("span");
+          handle.className = "manager-drag-handle";
+          handle.textContent = "⋮⋮";
+          handle.title = "Trascina per riordinare";
+          handle.draggable = true;
+          tdOrder.appendChild(handle);
+
+          handle.addEventListener("dragstart", function(ev){
+            tr.classList.add("dragging");
+            ev.dataTransfer.effectAllowed = "move";
+            ev.dataTransfer.setData("text/plain", String(idx));
+            try{
+              dragGhost = document.createElement("div");
+              dragGhost.className = "station-manager-ghost";
+              dragGhost.textContent = s.name;
+              document.body.appendChild(dragGhost);
+              if(ev.dataTransfer.setDragImage){
+                ev.dataTransfer.setDragImage(dragGhost, 20, 20);
+              }
+            }catch(e){}
+          });
+
+          handle.addEventListener("dragend", function(){
+            tr.classList.remove("dragging");
+            clearDropMarks();
+            if(dragGhost && dragGhost.parentNode) dragGhost.parentNode.removeChild(dragGhost);
+            dragGhost = null;
+          });
+
+          tr.addEventListener("dragover", function(ev){
+            ev.preventDefault();
+            clearDropMarks();
+            tr.classList.add("manager-row-drop");
+          });
+
+          tr.addEventListener("dragleave", function(){
+            tr.classList.remove("manager-row-drop");
+          });
+
+          tr.addEventListener("drop", function(ev){
+            ev.preventDefault();
+            clearDropMarks();
+            var from = parseInt(ev.dataTransfer.getData("text/plain"), 10);
+            var to = idx;
+            if(isNaN(from) || isNaN(to)) return;
+            moveDraft(from, to);
+          });
+
+          tr.appendChild(tdState);
+          tr.appendChild(tdName);
+          tr.appendChild(tdOrder);
+          stationsManagerBody.appendChild(tr);
+        })(i);
+      }
+    }
+
+    function saveStationsManager(){
+      if(!Array.isArray(stationsDraft)) return closeStationsManager();
+      state.stationsConfig = normalizeStationsConfig(stationsDraft);
+      setPhasesFromState();
+      save();
+      render();
+      closeStationsManager();
+    }
+
+function activeAthletes(){
+      var out = [];
+      for(var i=0;i<state.athletes.length;i++){
+        var n = state.athletes[i].name;
+        if(n && n.replace(/\s+/g,"").length>0) out.push(state.athletes[i]);
+      }
+      return out;
+    }
+
+    function currentPhaseIndex(a){
+      return Math.min(a.phaseStartsMs.length, PHASES.length);
+    }
+
+    function sumForIndexes(a, indexes, nowMs){
+      var starts = a.phaseStartsMs;
+      var endMs = (a.finishMs!=null) ? a.finishMs : nowMs;
+      var sum = 0;
+      for(var k=0;k<indexes.length;k++){
+        var i = indexes[k];
+        var s = starts[i];
+        if(s==null) continue;
+        var e = (starts[i+1]!=null) ? starts[i+1] : endMs;
+        sum += Math.max(0, e - s);
+      }
+      return sum;
+    }
+
+    function totalForAthlete(a, nowMs){
+      if(a.phaseStartsMs.length===0) return 0;
+      var start0 = a.phaseStartsMs[0];
+      var end = (a.finishMs!=null) ? a.finishMs : nowMs;
+      return Math.max(0, end - start0);
+    }
+    function phaseTimer(a, nowMs){
+      if(a.finishMs!=null) return 0;
+      if(a.phaseStartsMs.length===0) return 0;
+      var last = a.phaseStartsMs[a.phaseStartsMs.length-1];
+      return Math.max(0, nowMs - last);
+    }
+
+    function setUI(){
+      raceNamePill.textContent = (state.raceName && state.raceName.trim()) ? state.raceName.trim() : "—";
+      raceStartPill.textContent = fmtWall(state.raceStartISO);
+      btnStartRace.disabled = isRaceStarted() || !hasAnyAthlete() || !hasAnySelectedStation();
+      btnPauseResume.disabled = !isRaceStarted();
+      btnExportResults.disabled = !isRaceStarted();
+      btnExportLog.disabled = !isRaceStarted();
+      btnPauseResume.textContent = state.paused ? "Resume" : "Pausa";
+      raceStatePill.classList.remove("status-running","status-paused");
+      raceStatePill.textContent = !isRaceStarted() ? "PRONTA" : (state.paused ? "IN PAUSA" : "IN CORSO");
+      if(isRaceStarted() && !state.paused){ raceStatePill.classList.add("status-running"); }
+      if(state.paused){ raceStatePill.classList.add("status-paused"); }
+      if(!isRaceStarted() && hasAnyAthlete() && hasAnySelectedStation()){
+        btnStartRace.classList.add("btn-start-ready");
+      }else{
+        btnStartRace.classList.remove("btn-start-ready");
+      }
+      if(btnSummarySort){ btnSummarySort.textContent = (state.summarySort === "progress") ? "Ordine: Avanzamento" : "Ordine: Numero"; }
+      if(btnSplitsTranspose){ btnSplitsTranspose.textContent = state.splitsTransposed ? "Vista: trasposta" : "Vista: normale"; }
+      if(themeModeSelect){ themeModeSelect.value = state.themeMode || "light"; }
+      if(viewModeSelect){ viewModeSelect.value = state.viewMode || "setup"; }
+      if(stationsSummaryText){ stationsSummaryText.textContent = summarizeStations(); }
+      applyThemeAndMode();
+      if(state.lastActionText){
+        lastActionBar.style.display = "";
+        lastActionText.textContent = state.lastActionText;
+      }else{
+        lastActionBar.style.display = "none";
+      }
+      if(state.resetArmed && nowEpoch() > state.resetArmUntil){ disarmReset(); }
+
+      raceNameInput.disabled = false;
+      if(roxModeSelect){ roxModeSelect.disabled = isRaceStarted(); }
+      btnImportCsv.disabled = isRaceStarted();
+      btnFillDemo.disabled = isRaceStarted();
+      btnClearNames.disabled = isRaceStarted();
+    }
+
+    function logEvent(e){ state.eventLog.push(e); }
+
+    function advanceAthleteByNum(num){
+      if(!(num>=1 && num<=20)) return;
+      advanceAthlete(state.athletes[num-1]);
+    }
+
+    function advanceAthlete(a){
+      if(!isRaceStarted()) return;
+      if(state.paused) return;
+      if(!a.name || !a.name.trim()) return;
+      if(a.finishMs!=null) return;
+      var lock = athleteClickLocks[a.num] || 0;
+      if(nowEpoch() - lock < 450) return;
+      athleteClickLocks[a.num] = nowEpoch();
+
+      var t = raceElapsedMs();
+      var wallISO = new Date().toISOString();
+
+      if(a.phaseStartsMs.length < PHASES.length){
+        var idx = a.phaseStartsMs.length;
+        a.phaseStartsMs.push(t);
+        a.history.push({type:"phaseStart", idx:idx, ms:t, wallISO:wallISO});
+        logEvent({type:"phaseStart", athleteNum:a.num, athleteName:a.name.trim(), phaseIndex:idx, phaseName:PHASES[idx], tMs:t, wallISO:wallISO});
+      }else{
+        a.finishMs = t;
+        a.history.push({type:"finish", ms:t, wallISO:wallISO});
+        logEvent({type:"finish", athleteNum:a.num, athleteName:a.name.trim(), tMs:t, wallISO:wallISO});
+      }
+      var nextPhaseName = (a.finishMs!=null) ? "FINISH" : PHASES[Math.max(0, a.phaseStartsMs.length-1)];
+      setLastAction(a.name.trim() + " • " + nextPhaseName + " • " + fmtHMS(t));
+      save(); render();
+    }
+
+    function undoAthlete(a){
+      if(!isRaceStarted()) return;
+      if(!a.history.length) return;
+      var last = a.history.pop();
+      if(last.type==="finish") a.finishMs = null;
+      if(last.type==="phaseStart" && a.phaseStartsMs.length) a.phaseStartsMs.pop();
+      setLastAction("UNDO • " + a.name.trim());
+      save(); render();
+    }
+
+    // --- KEY FIX: event delegation on pointerdown/touchstart (no delayed click) ---
+    function findBtn(t){
+      while(t && t !== cardsGrid){
+        if(t.tagName && t.tagName.toLowerCase()==="button") return t;
+        t = t.parentNode;
+      }
+      return null;
+    }
+    function handleActionFromTarget(target){
+      var btn = findBtn(target);
+      if(!btn) return false;
+      if(btn.disabled) return true; // swallow
+      var adv = btn.getAttribute("data-adv");
+      var undo = btn.getAttribute("data-undo");
+      if(adv){
+        advanceAthleteByNum(Number(adv));
+        return true;
+      }
+      if(undo){
+        undoAthlete(state.athletes[Number(undo)-1]);
+        return true;
+      }
+      var penwarn = btn.getAttribute("data-penwarn");
+      if(penwarn){
+        registerPenaltyForAthlete(state.athletes[Number(penwarn)-1], 'warning', 1);
+        return true;
+      }
+      var pen15 = btn.getAttribute("data-pen15");
+      if(pen15){
+        registerPenaltyForAthlete(state.athletes[Number(pen15)-1], 'p15', 1);
+        return true;
+      }
+      var pen180 = btn.getAttribute("data-pen180");
+      if(pen180){
+        registerPenaltyForAthlete(state.athletes[Number(pen180)-1], 'p180', 1);
+        return true;
+      }
+      var undopen = btn.getAttribute("data-undopen");
+      if(undopen){
+        undoLastPenaltyForAthlete(state.athletes[Number(undopen)-1]);
+        return true;
+      }
+      return false;
+    }
+
+    // use pointerdown if available, else touchstart/mousedown
+    var downEvent = ("onpointerdown" in window) ? "pointerdown" : ("ontouchstart" in window ? "touchstart" : "mousedown");
+    cardsGrid.addEventListener(downEvent, function(ev){
+      if(setupOverlay.classList.contains("show")) return;
+      var handled = handleActionFromTarget(ev.target);
+      if(handled){
+        ev.preventDefault && ev.preventDefault();
+        ev.stopPropagation && ev.stopPropagation();
+      }
+    }, true);
+
+    // also handle click as fallback
+    cardsGrid.addEventListener("click", function(ev){
+      var handled = handleActionFromTarget(ev.target);
+      if(handled){
+        ev.preventDefault && ev.preventDefault();
+        ev.stopPropagation && ev.stopPropagation();
+      }
+    }, true);
+
+    function buildCards(){
+      var nowMs = raceElapsedMs();
+      var started = isRaceStarted();
+      var paused = state.paused;
+
+      cardsGrid.innerHTML = "";
+      var list = activeAthletes();
+      if(!list.length){
+        var c = document.createElement("div");
+        c.className = "card";
+        c.innerHTML = '<div class="head"><div style="font-weight:900">Nessun atleta</div><div class="muted" style="font-size:12px">Apri Setup</div></div><div class="body"><div class="muted" style="font-size:12px">Inserisci almeno 1 nome, poi Start gara.</div></div>';
+        cardsGrid.appendChild(c);
+        return;
+      }
+
+      for(var i=0;i<list.length;i++){
+        (function(a){
+          var idx = currentPhaseIndex(a);
+          var col = COLORS[(a.num-1)%COLORS.length];
+
+          var total = finalTotalForAthlete(a, nowMs);
+          var stationName = currentStationForAthlete(a);
+          var penUI = stationPenaltyUIState(a);
+          var runSum = sumForIndexes(a, RUN_INDEXES, nowMs);
+          var roxSum = sumForIndexes(a, ROX_INDEXES, nowMs);
+          var exSum = sumForIndexes(a, EX_INDEXES, nowMs);
+          var phT = phaseTimer(a, nowMs);
+
+          var phaseName = "—";
+          if(a.finishMs!=null) phaseName = "FINISH";
+          else if(idx===0) phaseName = "—";
+          else phaseName = PHASES[idx-1];
+          var phaseKind = getPhaseKind(phaseName);
+          var phaseCardClass = phaseKind ? (' phase-' + phaseKind + '-card') : '';
+
+          var nextText = "";
+          if(!started) nextText = "Start gara";
+          else if(paused) nextText = "In pausa";
+          else if(a.finishMs!=null) nextText = "Finito";
+          else if(idx < PHASES.length) nextText = "START " + PHASES[idx];
+          else nextText = "FINISH";
+
+          var card = document.createElement("div");
+          card.className = 'card' + phaseCardClass;
+          card.innerHTML =
+            '<div class="head">' +
+              '<div style="display:flex;gap:10px;align-items:center;min-width:0">' +
+                '<div class="badge" style="background:'+col+'">'+a.num+'</div>' +
+                '<div style="min-width:0">' +
+                  '<div class="name">'+escapeHtml(a.name.trim())+'</div>' +
+                  '<div class="muted" style="font-size:11px;margin-top:1px;display:flex;gap:8px;flex-wrap:wrap">' +
+                    '<span>Fase: <span class="phase-chip phase-'+phaseKind+'">'+escapeHtml(phaseName)+'</span></span>' +
+                    '<span>RUN: <span class="mono">'+fmtHMS(runSum)+'</span></span>' +
+                    '<span>EX: <span class="mono">'+fmtHMS(exSum)+'</span></span>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="mono" style="font-size:12px;color:#9fb0c6;border:1px dashed #23324a;border-radius:10px;padding:5px 8px;background:rgba(0,0,0,.15)">' +
+                ((a.num<=9)?("tasto "+a.num):((a.num===10)?"tasto 0":"—")) +
+              '</div>' +
+            '</div>' +
+            '<div class="body">' +
+              '<p class="big">'+fmtHMS(total)+'</p>' +
+              '<div class="muted" style="font-size:12px;display:flex;justify-content:space-between;gap:10px;margin-bottom:10px">' +
+                '<span>Timer fase</span><span class="mono"><b style="color:#e7edf7">'+fmtHMS(phT)+'</b></span>' +
+              '</div>' +
+              '<div class="btnrow">' +
+                '<button data-adv="'+a.num+'" '+((!started||paused||a.finishMs!=null)?'disabled':'')+'>'+nextText+'</button>' +
+                '<button data-undo="'+a.num+'" '+((!started||!a.history.length)?'disabled':'')+'>Annulla ultimo</button>' +
+              '</div>' +
+              (started && !paused && penUI.isExerciseStation ? (
+                '<div class="penalty-mini">' +
+                  
+                  '<div class="penalty-actions ' + (penUI.hasWarning ? '' : 'is-warning-only') + '">' +
+                    '<button class="btn-pen-warn" data-penwarn="'+a.num+'" '+(penUI.hasWarning ? 'disabled' : '')+'>'+(penUI.hasWarning ? 'Warning dato' : 'Warning')+'</button>' +
+                    '<button class="btn-pen-15 btn-pen-time" data-pen15="'+a.num+'" '+((a.finishMs!=null) ? 'disabled' : '')+'>+15 sec</button>' +
+                    '<button class="btn-pen-180 btn-pen-time" data-pen180="'+a.num+'" '+((a.finishMs!=null) ? 'disabled' : '')+'>+3 min</button>' +
+                    '<button class="btn-pen-undo btn-pen-time" data-undopen="'+a.num+'">Undo penalità</button>' +
+                  '</div>' +
+                '</div>'
+              ) : '') +
+            '</div>';
+
+          cardsGrid.appendChild(card);
+        })(list[i]);
+      }
+    }
+
+    function buildSummary(){
+      var nowMs = raceElapsedMs();
+      var list = activeAthletes();
+
+      // Sort:
+      // 1) chi è più avanti (FINISH > più fasi startate)
+      // 2) a parità di avanzamento, tempo totale più basso
+      // 3) fallback: numero atleta
+      if(state.summarySort === "progress"){
+        list.sort(function(a,b){
+          var aProg = (a.finishMs!=null) ? 999 : a.phaseStartsMs.length; // FINISH in cima
+          var bProg = (b.finishMs!=null) ? 999 : b.phaseStartsMs.length;
+          if(bProg !== aProg) return bProg - aProg;
+
+          var aTot = finalTotalForAthlete(a, nowMs);
+          var bTot = finalTotalForAthlete(b, nowMs);
+          if(aTot !== bTot) return aTot - bTot;
+
+          return a.num - b.num;
+        });
+      }else{
+        // "num": ordine naturale
+        list.sort(function(a,b){ return a.num - b.num; });
+      }
+
+      summaryBody.innerHTML = "";
+
+      for(var i=0;i<list.length;i++){
+        (function(a){
+          var idx = currentPhaseIndex(a);
+          var phase = "—";
+          if(a.finishMs!=null) phase = "FINISH";
+          else if(idx===0) phase = "—";
+          else phase = PHASES[idx-1];
+          var phaseKind2 = getPhaseKind(phase);
+
+          var col = COLORS[(a.num-1)%COLORS.length];
+          var runSum = sumForIndexes(a, RUN_INDEXES, nowMs);
+          var roxSum = sumForIndexes(a, ROX_INDEXES, nowMs);
+          var exSum = sumForIndexes(a, EX_INDEXES, nowMs);
+          var total = finalTotalForAthlete(a, nowMs);
+          var stationName = currentStationForAthlete(a);
+
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            '<td class="mono"><span class="dot" style="background:'+col+';margin-right:8px;vertical-align:middle"></span>'+a.num+'</td>' +
+            '<td>'+escapeHtml(a.name.trim())+'</td>' +
+            '<td>'+(phaseKind2 ? '<span class="phase-chip phase-'+phaseKind2+'">'+escapeHtml(phase)+'</span>' : escapeHtml(phase))+'</td>' +
+            '<td class="mono" style="text-align:left">'+fmtHMS(runSum)+'</td>' +
+            '<td class="mono" style="text-align:left">'+fmtHMS(roxSum)+'</td>' +
+            '<td class="mono" style="text-align:left">'+fmtHMS(exSum)+'</td>' +
+            '<td class="mono" style="text-align:left"><b>'+fmtHMS(total)+'</b></td>';
+          summaryBody.appendChild(tr);
+        })(list[i]);
+      }
+    }
+
+
+    function buildSplits(){
+      if(!splitsHead || !splitsBody) return;
+      var nowMs = raceElapsedMs();
+      var list = activeAthletes();
+
+      // Build visible phase list (exclude Rox single phases)
+      var visiblePhases = [];
+      for(var i=0;i<PHASES.length;i++){
+        if(/^RZ\b/i.test(PHASES[i])) continue;
+        visiblePhases.push({name: PHASES[i], idx: i});
+      }
+
+      // NORMAL VIEW: columns = phases
+      if(!state.splitsTransposed){
+        var h = [];
+        h.push('<tr>');
+        h.push('<th>#</th>');
+        h.push('<th>Atleta</th>');
+        for(var j=0;j<visiblePhases.length;j++){
+          h.push('<th class="mono" style="white-space:nowrap">'+escapeHtml(visiblePhases[j].name)+'</th>');
+        }
+        if(state.roxEnabled){
+          h.push('<th class="mono" style="white-space:nowrap">ROX TOT</th>');
+        }
+        h.push('<th class="mono" style="white-space:nowrap">TOT</th>');
+        h.push('</tr>');
+        splitsHead.innerHTML = h.join('');
+
+        splitsBody.innerHTML = '';
+        for(var aIdx=0;aIdx<list.length;aIdx++){
+          var a = list[aIdx];
+          var col = COLORS[(a.num-1)%COLORS.length];
+          var row = [];
+          row.push('<tr>');
+          row.push('<td class="mono"><span class="dot" style="background:'+col+';margin-right:8px;vertical-align:middle"></span>'+a.num+'</td>');
+          row.push('<td>'+escapeHtml(a.name.trim())+'</td>');
+
+          for(var p=0;p<visiblePhases.length;p++){
+            var phaseIdx = visiblePhases[p].idx;
+            var s = a.phaseStartsMs[phaseIdx];
+            if(s==null){
+              row.push('<td class="mono" style="text-align:left">—</td>');
+              continue;
+            }
+            var end = (a.phaseStartsMs[phaseIdx+1]!=null) ? a.phaseStartsMs[phaseIdx+1] : ((a.finishMs!=null)?a.finishMs:nowMs);
+            var dur = Math.max(0, end - s);
+            row.push('<td class="mono" style="text-align:left">'+fmtMS(dur)+'</td>');
+          }
+
+          if(state.roxEnabled){
+            var roxTotal = sumForIndexes(a, ROX_INDEXES, nowMs);
+            row.push('<td class="mono" style="text-align:left"><b>'+fmtMS(roxTotal)+'</b></td>');
+          }
+
+          var rawTotal = totalForAthlete(a, nowMs);
+          var penaltyMs = penaltySecondsForAthlete(a.num) * 1000;
+          var total = rawTotal + penaltyMs;
+          var stationName = currentStationForAthlete(a);
+          var totalHtml = '<b>'+fmtHMS(total)+'</b>';
+          if(a.finishMs!=null && penaltyMs > 0){
+            totalHtml += '<div class="muted" style="font-size:11px;margin-top:4px">gara '+fmtHMS(rawTotal)+' + pen '+fmtHMS(penaltyMs)+'</div>';
+          }
+          row.push('<td class="mono" style="text-align:left">'+totalHtml+'</td>');
+          row.push('</tr>');
+          splitsBody.insertAdjacentHTML('beforeend', row.join(''));
+        }
+        return;
+      }
+
+      // TRANSPOSED VIEW: columns = athletes, rows = phases
+      var h2 = [];
+      h2.push('<tr>');
+      h2.push('<th>Fase</th>');
+      for(var a2=0;a2<list.length;a2++){
+        var aa = list[a2];
+        var cc = COLORS[(aa.num-1)%COLORS.length];
+        h2.push('<th class="mono" style="white-space:nowrap"><span class="dot" style="background:'+cc+';margin-right:8px;vertical-align:middle"></span>'+escapeHtml(aa.name.trim())+'</th>');
+      }
+      h2.push('</tr>');
+      splitsHead.innerHTML = h2.join('');
+
+      splitsBody.innerHTML = '';
+
+      // phase rows
+      for(var vp=0; vp<visiblePhases.length; vp++){
+        var row2 = [];
+        row2.push('<tr>');
+        row2.push('<td class="mono">'+escapeHtml(visiblePhases[vp].name)+'</td>');
+        for(var a3=0; a3<list.length; a3++){
+          var at = list[a3];
+          var idxp = visiblePhases[vp].idx;
+          var ss = at.phaseStartsMs[idxp];
+          if(ss==null){
+            row2.push('<td class="mono" style="text-align:left">—</td>');
+            continue;
+          }
+          var ee = (at.phaseStartsMs[idxp+1]!=null) ? at.phaseStartsMs[idxp+1] : ((at.finishMs!=null)?at.finishMs:nowMs);
+          var dd = Math.max(0, ee - ss);
+          row2.push('<td class="mono" style="text-align:left">'+fmtMS(dd)+'</td>');
+        }
+        row2.push('</tr>');
+        splitsBody.insertAdjacentHTML('beforeend', row2.join(''));
+      }
+
+      if(state.roxEnabled){
+        var rowR = [];
+        rowR.push('<tr>');
+        rowR.push('<td class="mono"><b>ROX TOT</b></td>');
+        for(var ar=0; ar<list.length; ar++){
+          var roxT = sumForIndexes(list[ar], ROX_INDEXES, nowMs);
+          rowR.push('<td class="mono" style="text-align:left"><b>'+fmtMS(roxT)+'</b></td>');
+        }
+        rowR.push('</tr>');
+        splitsBody.insertAdjacentHTML('beforeend', rowR.join(''));
+      }
+
+      var rowT = [];
+      rowT.push('<tr>');
+      rowT.push('<td class="mono"><b>TOT</b></td>');
+      for(var at2=0; at2<list.length; at2++){
+        var rawTot = totalForAthlete(list[at2], nowMs);
+        var penTot = penaltySecondsForAthlete(list[at2].num) * 1000;
+        var tot = rawTot + penTot;
+        var cellHtml = '<b>'+fmtHMS(tot)+'</b>';
+        if(list[at2].finishMs!=null && penTot > 0){
+          cellHtml += '<div class="muted" style="font-size:11px;margin-top:4px">gara '+fmtHMS(rawTot)+' + pen '+fmtHMS(penTot)+'</div>';
+        }
+        rowT.push('<td class="mono" style="text-align:left">'+cellHtml+'</td>');
+      }
+      rowT.push('</tr>');
+      splitsBody.insertAdjacentHTML('beforeend', rowT.join(''));
+    }
+
+    
+    function buildFinalDashboard(){
+      if(!dashboardWrap || !dashboardGrid) return;
+      var list = activeAthletes().slice();
+      var allFinished = list.length > 0;
+      for(var i=0;i<list.length;i++){
+        if(list[i].finishMs==null){ allFinished = false; break; }
+      }
+      if(!allFinished){
+        dashboardWrap.style.display = "none";
+        dashboardGrid.innerHTML = "";
+        return;
+      }
+      dashboardWrap.style.display = "";
+      list.sort(function(a,b){ return finalTotalForAthlete(a, raceElapsedMs()) - finalTotalForAthlete(b, raceElapsedMs()); });
+      var winner = list[0];
+      var bestRun = list[0], bestEx = list[0], bestRox = list[0];
+      for(var j=1;j<list.length;j++){
+        if(sumForIndexes(list[j], RUN_INDEXES, raceElapsedMs()) < sumForIndexes(bestRun, RUN_INDEXES, raceElapsedMs())) bestRun = list[j];
+        if(sumForIndexes(list[j], EX_INDEXES, raceElapsedMs()) < sumForIndexes(bestEx, EX_INDEXES, raceElapsedMs())) bestEx = list[j];
+        if(sumForIndexes(list[j], ROX_INDEXES, raceElapsedMs()) < sumForIndexes(bestRox, ROX_INDEXES, raceElapsedMs())) bestRox = list[j];
+      }
+      var cards = [];
+      cards.push('<div class="metric"><div class="k">Vincitore</div><div class="v">'+escapeHtml(winner.name.trim())+'</div><div class="s">'+fmtHMS(finalTotalForAthlete(winner, raceElapsedMs()))+'</div></div>');
+      cards.push('<div class="metric"><div class="k">Atleti finiti</div><div class="v">'+list.length+'</div><div class="s">classifica completa pronta</div></div>');
+      cards.push('<div class="metric"><div class="k">Best RUN</div><div class="v">'+fmtHMS(sumForIndexes(bestRun, RUN_INDEXES, raceElapsedMs()))+'</div><div class="s">'+escapeHtml(bestRun.name.trim())+'</div></div>');
+      cards.push('<div class="metric"><div class="k">Best EX</div><div class="v">'+fmtHMS(sumForIndexes(bestEx, EX_INDEXES, raceElapsedMs()))+'</div><div class="s">'+escapeHtml(bestEx.name.trim())+'</div></div>');
+      if(state.roxEnabled){
+        cards.push('<div class="metric"><div class="k">Best ROX</div><div class="v">'+fmtHMS(sumForIndexes(bestRox, ROX_INDEXES, raceElapsedMs()))+'</div><div class="s">'+escapeHtml(bestRox.name.trim())+'</div></div>');
+      }
+      dashboardGrid.innerHTML = cards.join('');
+    }
+
+function buildRoxTable(){
+      if(!roxSection || !roxHead || !roxBody) return;
+      if(!state.roxEnabled){
+        roxSection.style.display = "none";
+        roxHead.innerHTML = "";
+        roxBody.innerHTML = "";
+        return;
+      }
+
+      roxSection.style.display = "";
+      var nowMs = raceElapsedMs();
+      var list = activeAthletes();
+
+      var h = [];
+      h.push('<tr>');
+      h.push('<th>#</th>');
+      h.push('<th>Atleta</th>');
+      for(var i=0;i<PHASES.length;i++){
+        if(!/^RZ\b/i.test(PHASES[i])) continue;
+        h.push('<th class="mono" style="white-space:nowrap">'+escapeHtml(PHASES[i])+'</th>');
+      }
+      h.push('<th class="mono" style="white-space:nowrap">ROX TOT</th>');
+      h.push('</tr>');
+      roxHead.innerHTML = h.join('');
+
+      roxBody.innerHTML = '';
+      for(var aIdx=0;aIdx<list.length;aIdx++){
+        var a = list[aIdx];
+        var col = COLORS[(a.num-1)%COLORS.length];
+        var row = [];
+        row.push('<tr>');
+        row.push('<td class="mono"><span class="dot" style="background:'+col+';margin-right:8px;vertical-align:middle"></span>'+a.num+'</td>');
+        row.push('<td>'+escapeHtml(a.name.trim())+'</td>');
+
+        for(var p=0;p<PHASES.length;p++){
+          if(!/^RZ\b/i.test(PHASES[p])) continue;
+          var s = a.phaseStartsMs[p];
+          if(s==null){
+            row.push('<td class="mono" style="text-align:left">—</td>');
+            continue;
+          }
+          var end = (a.phaseStartsMs[p+1]!=null) ? a.phaseStartsMs[p+1] : ((a.finishMs!=null)?a.finishMs:nowMs);
+          var dur = Math.max(0, end - s);
+          row.push('<td class="mono" style="text-align:left">'+fmtMS(dur)+'</td>');
+        }
+
+        var roxTotal = sumForIndexes(a, ROX_INDEXES, nowMs);
+        row.push('<td class="mono" style="text-align:left"><b>'+fmtMS(roxTotal)+'</b></td>');
+        row.push('</tr>');
+        roxBody.insertAdjacentHTML('beforeend', row.join(''));
+      }
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, function(c){
+        return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+      });
+    }
+
+    
+    
+    function hasAnyAthlete(){
+      for(var i=0;i<state.athletes.length;i++){
+        if(state.athletes[i].name && state.athletes[i].name.trim().length>0){
+          return true;
+        }
+
+    function disarmReset(){
+      state.resetArmed = false;
+      state.resetArmUntil = 0;
+      btnResetRace.classList.remove("btn-reset-armed");
+      btnResetRace.textContent = "Reset gara";
+    }
+
+    function armReset(){
+      state.resetArmed = true;
+      state.resetArmUntil = nowEpoch() + 6000; // 6s window
+      btnResetRace.classList.add("btn-reset-armed");
+      btnResetRace.textContent = "CONFERMA RESET (6s)";
+      autosaveHint.textContent = "⚠️ Premi di nuovo RESET entro 6 secondi per azzerare TUTTO.";
+      // countdown text
+      var timer = setInterval(function(){
+        if(!state.resetArmed){ clearInterval(timer); return; }
+        var left = Math.max(0, state.resetArmUntil - nowEpoch());
+        var sec = Math.ceil(left/1000);
+        btnResetRace.textContent = sec>0 ? ("CONFERMA RESET ("+sec+"s)") : "CONFERMA RESET";
+        if(left<=0){
+          clearInterval(timer);
+          disarmReset();
+          autosaveHint.textContent = "Autosave attivo.";
+        }
+      }, 200);
+    }
+      }
+      return false;
+    }
+
+    function updateLoadAthletesButton(){
+      var btn = document.getElementById("btnLoadAthletes");
+      if(!btn) return;
+      var hasAny = false;
+      for(var i=0;i<state.athletes.length;i++){
+        if(state.athletes[i].name && state.athletes[i].name.trim().length>0){
+          hasAny = true; break;
+        }
+      }
+      if(!hasAny){
+        btn.textContent = "Caricare almeno 1 nome";
+        btn.classList.remove("btn-load-athletes");
+        btn.classList.add("btn-load-disabled");
+        btn.disabled = true;
+      }else{
+        btn.textContent = "Carica ATLETI";
+        btn.classList.remove("btn-load-disabled");
+        btn.classList.add("btn-load-athletes");
+        btn.disabled = false;
+      }
+    }
+
+    function render(){
+      if(!Array.isArray(state.penalties)) state.penalties = [];
+      if(typeof buildStationsTable==='function'){ buildStationsTable(); }
+      if(typeof buildPenaltiesTable==='function'){ buildPenaltiesTable(); }
+      setPhasesFromState();
+      state.raceName = raceNameInput.value || state.raceName || "";
+      setUI();
+      buildCards();
+      buildSummary();
+      buildSplits();
+      buildRoxTable();
+      buildFinalDashboard();
+      updateLoadAthletesButton();
+      setUI();
+      buildSplits();
+    }
+
+    function startRace(){
+      if(isRaceStarted()) return;
+      state.penalties = [];
+      setPhasesFromState();
+      state.raceName = raceNameInput.value || state.raceName || "";
+      if(!state.raceName || !state.raceName.trim()) state.raceName = "Gara HYROX";
+      state.raceStartISO = new Date().toISOString();
+      state.raceStartEpochMs = nowEpoch();
+      state.paused = false;
+      state.pauseStartEpochMs = null;
+      state.pausedAccumMs = 0;
+      logEvent({type:"raceStart", tMs:0, wallISO:state.raceStartISO});
+      setLastAction("START GARA • " + (state.raceName || "Gara HYROX"));
+      buildPenaltiesTable();
+      save();
+      window.__hyroxCloseSetup();
+      render();
+    }
+
+    function togglePause(){
+      if(!isRaceStarted()) return;
+      var wallISO = new Date().toISOString();
+      if(!state.paused){
+        state.paused = true;
+        state.pauseStartEpochMs = nowEpoch();
+        logEvent({type:"pause", tMs:raceElapsedMs(), wallISO:wallISO});
+      }else{
+        var resume = nowEpoch();
+        var pausedThis = resume - (state.pauseStartEpochMs || resume);
+        state.pausedAccumMs += pausedThis;
+        state.paused = false;
+        state.pauseStartEpochMs = null;
+        logEvent({type:"resume", tMs:raceElapsedMs(), wallISO:wallISO});
+      }
+      setLastAction(state.paused ? "PAUSA GARA" : "RESUME GARA");
+      save(); render();
+    }
+
+    function resetRace(){
+      state.raceStartISO = null;
+      state.raceStartEpochMs = null;
+      state.paused = false;
+      state.pauseStartEpochMs = null;
+      state.pausedAccumMs = 0;
+      state.stationsConfig = defaultStationsConfig();
+      setPhasesFromState();
+      for(var i=0;i<state.athletes.length;i++){
+        state.athletes[i].phaseStartsMs = [];
+        state.athletes[i].finishMs = null;
+        state.athletes[i].history = [];
+      }
+      logEvent({type:"raceReset", tMs:0, wallISO:new Date().toISOString()});
+      setLastAction("RESET GARA");
+      save(); render();
+    }
+
+    function exportResults(){
+      if(!isRaceStarted()) return;
+      var d = new Date(state.raceStartISO || new Date().toISOString());
+      var base = sanitizeFileName(state.raceName || "Gara_HYROX");
+      var filename = base + "_" + d.getFullYear() + "-" + fmt2(d.getMonth()+1) + "-" + fmt2(d.getDate()) + "_" + fmt2(d.getHours()) + "-" + fmt2(d.getMinutes()) + "-" + fmt2(d.getSeconds()) + ".csv";
+
+      var list = activeAthletes();
+      var nowMs = raceElapsedMs();
+
+      var lines = [];
+      lines.push("Gara;" + csvEscape(state.raceName || ""));
+      lines.push("Partenza;" + csvEscape(fmtWall(state.raceStartISO)));
+      lines.push("");
+
+      var header = ["Num","Nome","Tot_RUN"]; if(state.roxEnabled){ header.push("Tot_ROX"); } header.push("Tot_ES","Gara_Tot","Penalty_Tot","Totale_Finale");
+      for(var i=0;i<PHASES.length;i++) header.push(PHASES[i]);
+      lines.push(header.join(";"));
+
+      for(var j=0;j<list.length;j++){
+        var a = list[j];
+        var runSum = sumForIndexes(a, RUN_INDEXES, nowMs);
+        var exSum = sumForIndexes(a, EX_INDEXES, nowMs);
+        var garaTot = totalForAthlete(a, nowMs);
+        var penaltyTot = penaltySecondsForAthlete(a.num) * 1000;
+        var total = garaTot + penaltyTot;
+        var roxSum = sumForIndexes(a, ROX_INDEXES, nowMs);
+        var row = [String(a.num), csvEscape(a.name.trim()), fmtHMS(runSum)]; if(state.roxEnabled){ row.push(fmtHMS(roxSum)); } row.push(fmtHMS(exSum), fmtHMS(garaTot), fmtHMS(penaltyTot), fmtHMS(total));
+        for(var k=0;k<PHASES.length;k++){
+          var s = a.phaseStartsMs[k];
+          if(s==null){ row.push(""); continue; }
+          var end = (a.phaseStartsMs[k+1]!=null) ? a.phaseStartsMs[k+1] : ((a.finishMs!=null)?a.finishMs:nowMs);
+          row.push(csvEscape(fmtHMS(Math.max(0, end - s))));
+        }
+        lines.push(row.join(";"));
+      }
+      downloadText(filename, lines.join("\n"), "text/csv;charset=utf-8");
+    }
+
+    function exportLog(){
+      if(!isRaceStarted()) return;
+      var d = new Date(state.raceStartISO || new Date().toISOString());
+      var base = sanitizeFileName(state.raceName || "Gara_HYROX");
+      var filename = base + "_LOG_" + d.getFullYear() + "-" + fmt2(d.getMonth()+1) + "-" + fmt2(d.getDate()) + "_" + fmt2(d.getHours()) + "-" + fmt2(d.getMinutes()) + "-" + fmt2(d.getSeconds()) + ".csv";
+
+      var lines = [];
+      lines.push("Gara;" + csvEscape(state.raceName || ""));
+      lines.push("Partenza;" + csvEscape(fmtWall(state.raceStartISO)));
+      lines.push("");
+      lines.push(["Ordine","Tipo","AtletaNum","AtletaNome","FaseIndex","FaseNome","t_gara_ms","t_gara_hms","wallclock_iso"].join(";"));
+
+      for(var i=0;i<state.eventLog.length;i++){
+        var e = state.eventLog[i];
+        var tms = (typeof e.tMs === "number") ? e.tMs : "";
+        var row = [
+          String(i+1),
+          csvEscape(e.type || ""),
+          csvEscape(e.athleteNum || ""),
+          csvEscape(e.athleteName || ""),
+          csvEscape((typeof e.phaseIndex === "number") ? (e.phaseIndex+1) : ""),
+          csvEscape(e.phaseName || ""),
+          csvEscape(tms),
+          csvEscape((typeof tms === "number") ? fmtHMS(tms) : ""),
+          csvEscape(e.wallISO || "")
+        ];
+        lines.push(row.join(";"));
+      }
+      downloadText(filename, lines.join("\n"), "text/csv;charset=utf-8");
+    }
+
+    function fillDemo(){
+      var demo = ["Vale","Gian","Cri","Gianlu"];
+      for(var i=0;i<state.athletes.length;i++) state.athletes[i].name = demo[i] ? demo[i] : "";
+      save(); buildAthletesTable();
+    buildStationsTable();
+    updateLoadAthletesButton(); render();
+    }
+    function clearNames(){
+      for(var i=0;i<state.athletes.length;i++) state.athletes[i].name = "";
+      save(); buildAthletesTable();
+    buildStationsTable();
+    updateLoadAthletesButton(); render();
+    }
+
+    function parseCSV(text){
+      var lines = text.split(/\r?\n/);
+      var out = [];
+      for(var i=0;i<lines.length;i++){
+        var line = lines[i].trim();
+        if(!line) continue;
+        var parts = line.indexOf(";")>=0 ? line.split(";") : (line.indexOf(",")>=0 ? line.split(",") : [line]);
+        for(var j=0;j<parts.length;j++) parts[j] = parts[j].trim();
+        if(parts.length===1) out.push({num:null,name:parts[0]});
+        else{
+          var n = Number(parts[0]);
+          out.push({num:isFinite(n)?n:null, name:parts.slice(1).join(" ").trim()});
+        }
+      }
+      return out;
+    }
+
+    function importCSV(text){
+      var rows = parseCSV(text);
+      for(var i=0;i<state.athletes.length;i++) state.athletes[i].name = "";
+      var used = {};
+      for(var r=0;r<rows.length;r++){
+        var row = rows[r];
+        if(row.name && row.name.trim()){
+          if(row.num && row.num>=1 && row.num<=20 && !used[row.num]){
+            state.athletes[row.num-1].name = row.name.trim();
+            used[row.num]=true;
+          }
+        }
+      }
+      var ptr = 1;
+      for(var r2=0;r2<rows.length;r2++){
+        var row2 = rows[r2];
+        if(!row2.name || !row2.name.trim()) continue;
+        if(row2.num && row2.num>=1 && row2.num<=20) continue;
+        while(ptr<=20 && state.athletes[ptr-1].name.trim()) ptr++;
+        if(ptr>20) break;
+        state.athletes[ptr-1].name = row2.name.trim();
+        ptr++;
+      }
+      save(); buildAthletesTable();
+    buildStationsTable();
+    updateLoadAthletesButton(); render();
+    }
+
+    // Bind UI
+    btnStartRace.onclick = startRace;
+    btnPauseResume.onclick = togglePause;
+    btnResetRace.onclick = function(){
+      if(!state.resetArmed){
+        armReset();
+        save();
+        return;
+      }
+      // second press within window
+      if(nowEpoch() <= state.resetArmUntil){
+        resetRace();
+        disarmReset();
+        autosaveHint.textContent = "Reset completato.";
+        setTimeout(function(){ autosaveHint.textContent = "Autosave attivo."; }, 1200);
+      }else{
+        disarmReset();
+      }
+      save();
+      render();
+    };
+    btnExportResults.onclick = exportResults;
+    btnExportLog.onclick = exportLog;
+    if(btnOpenStationsManager){
+      btnOpenStationsManager.onclick = function(){ openStationsManager(); };
+    }
+    if(btnStationsCancel){
+      btnStationsCancel.onclick = function(){ closeStationsManager(); };
+    }
+    if(btnStationsSave){
+      btnStationsSave.onclick = function(){ saveStationsManager(); };
+    }
+
+    if(btnSplitsTranspose){
+      btnSplitsTranspose.onclick = function(){
+        state.splitsTransposed = !state.splitsTransposed;
+        save();
+        render();
+      };
+    }
+
+    // Bind Reset gara double confirm
+    if(btnResetRace){ btnResetRace.onclick = handleResetClick; }
+
+
+    if(btnSummarySort){
+      btnSummarySort.onclick = function(){
+        state.summarySort = (state.summarySort === "progress") ? "num" : "progress";
+        btnSummarySort.textContent = (state.summarySort === "progress") ? "Ordine: Avanzamento" : "Ordine: Numero";
+        save();
+        render();
+      };
+    }
+
+
+    btnFillDemo.onclick = fillDemo;
+    btnClearNames.onclick = clearNames;
+
+    btnImportCsv.onclick = function(){ fileCsv.click(); };
+    fileCsv.onchange = function(){
+      var f = fileCsv.files && fileCsv.files[0];
+      if(!f) return;
+      var reader = new FileReader();
+      reader.onload = function(){ importCSV(String(reader.result || "")); fileCsv.value = ""; };
+      reader.readAsText(f);
+    };
+
+    raceNameInput.oninput = function(){ state.raceName = raceNameInput.value; save(); render(); };
+    if(themeModeSelect){
+      themeModeSelect.onchange = function(){
+        state.themeMode = themeModeSelect.value || "light";
+        save();
+        render();
+      };
+    }
+    if(viewModeSelect){
+      viewModeSelect.onchange = function(){
+        state.viewMode = viewModeSelect.value || "setup";
+        save();
+        render();
+      };
+    }
+    try{
+      if(window.matchMedia){
+        window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", function(){
+          if(state.themeMode === "auto"){ render(); }
+        });
+      }
+    }catch(e){}
+
+
+    if(roxModeSelect){
+      roxModeSelect.onchange = function(){
+        if(isRaceStarted()) return;
+        // sicurezza: non cambiare se qualcuno ha già timbrato
+        for(var i=0;i<state.athletes.length;i++){
+          if(state.athletes[i].phaseStartsMs && state.athletes[i].phaseStartsMs.length){
+            roxModeSelect.value = state.roxEnabled ? "yes" : "no";
+            return;
+          }
+        }
+        state.roxEnabled = (roxModeSelect.value === "yes");
+        setPhasesFromState();
+        save();
+        render();
+      };
+    }
+
+    // Keyboard shortcuts (ANTI-DOPPIO CLICK)
+// Prima ascoltavo sia keydown che keyup: su molti PC questo equivale a "doppio click".
+// Ora ascolto SOLO keydown + blocco repeat e metto un debounce per atleta.
+var __lastKeyFire = {}; // athleteNum -> epoch ms
+
+function onKey(ev){
+  if(ev.key === "Escape"){ window.__hyroxCloseSetup(); return; }
+  if(setupOverlay.classList.contains("show")) return;
+
+  // evita ripetizione quando tieni premuto il tasto
+  if(ev.repeat) return;
+
+  var tag = ev.target && ev.target.tagName ? ev.target.tagName.toLowerCase() : "";
+  if(tag==="input"||tag==="textarea"||tag==="select") return;
+
+  var num = null;
+  if(ev.key>="1" && ev.key<="9") num = Number(ev.key);
+  if(ev.key==="0") num = 10;
+
+  if(num!==null){
+    var t = nowEpoch();
+    var last = __lastKeyFire[num] || 0;
+    // debounce 300ms per atleta
+    if(t - last < 300) return;
+    __lastKeyFire[num] = t;
+
+    ev.preventDefault && ev.preventDefault();
+    ev.stopPropagation && ev.stopPropagation();
+    advanceAthleteByNum(num);
+  }
+}
+window.addEventListener("keydown", onKey, true);
+
+    // less aggressive redraw: 10 FPS
+    function tick(){
+      raceClockPill.textContent = fmtHMS(raceElapsedMs());
+      if(lastActionBar && state.lastActionText){
+        lastActionBar.style.display = "";
+        lastActionText.textContent = state.lastActionText;
+        var delta = Math.max(0, nowEpoch() - (state.lastActionEpochMs||nowEpoch()));
+        lastActionAge.textContent = (delta < 5000) ? "ora" : (fmtMS(delta) + " fa");
+      }
+      // rebuild UI at 10fps: enough for timers, avoids destroying DOM too often
+      buildCards();
+      buildSummary();
+      buildSplits();
+      buildRoxTable();
+      buildFinalDashboard();
+      updateLoadAthletesButton();
+      setUI();
+      setTimeout(tick, 100);
+    }
+
+    var hasSaved = load();
+    if(!hasSaved){
+      fillDemo();
+      state.raceName = "Sim HYROX Gattinara - GTN";
+      raceNameInput.value = state.raceName;
+      save();
+    }else{
+      raceNameInput.value = state.raceName || "";
+    }
+    if(roxModeSelect){ roxModeSelect.value = state.roxEnabled ? "yes" : "no"; }
+    if(themeModeSelect){ themeModeSelect.value = state.themeMode || "light"; }
+    if(viewModeSelect){ viewModeSelect.value = state.viewMode || "setup"; }
+    setPhasesFromState();
+
+
+    buildAthletesTable();
+    buildStationsTable();
+    updateLoadAthletesButton();
+    setPhasesFromState();
+    setUI();
+    buildCards();
+    buildSummary();
+    buildSplits();
+    buildRoxTable();
+    buildFinalDashboard();
+
+    if(!isRaceStarted()) window.__hyroxOpenSetup();
+    tick();
+
+  }catch(err){
+    showFatal("Errore JavaScript: " + (err && err.message ? err.message : String(err)) + ".");
+  }
+
+    if(btnFullscreen){
+      btnFullscreen.onclick = function(){
+        if(!document.fullscreenElement){
+          var el = document.documentElement;
+          if(el.requestFullscreen) el.requestFullscreen();
+        }else{
+          if(document.exitFullscreen) document.exitFullscreen();
+        }
+      };
+      document.addEventListener("fullscreenchange", function(){
+        if(document.fullscreenElement){
+          btnFullscreen.textContent = "Esci Fullscreen";
+        }else{
+          btnFullscreen.textContent = "Fullscreen";
+        }
+      });
+    }
+
+})();
+</script>
+</body>
+</html>
